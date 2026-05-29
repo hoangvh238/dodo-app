@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useTransition } from "react";
 import {
   Upload, Tag, Package, X, CheckCircle2, AlertCircle,
-  Download, Trash2, Clock, Link2, Github, ExternalLink,
+  Download, Trash2, Clock, Link2, HardDrive,
 } from "lucide-react";
 import {
   publishReleaseAction,
@@ -129,18 +129,14 @@ export default function ReleasesPage() {
         </p>
       </div>
 
-      {/* Provider tip */}
-      <div className="flex items-start gap-3 bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-sm">
-        <Github size={16} className="text-slate-300 mt-0.5 shrink-0" />
+      {/* Storage info */}
+      <div className="flex items-center gap-3 bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-sm">
+        <HardDrive size={15} className="text-slate-300 shrink-0" />
         <span className="text-slate-400">
-          <span className="text-slate-200 font-medium">Large files (&gt;50 MB):</span> Upload to{" "}
-          <a href="https://github.com/hoangvh238/dodo-releases/releases/new"
-            target="_blank" rel="noreferrer"
-            className="text-brand hover:underline inline-flex items-center gap-1">
-            GitHub Releases <ExternalLink size={11} />
-          </a>
-          , copy the asset URL, then use <span className="text-slate-200 font-medium">Link URL</span> mode below.
-          Free · up to 2 GB · global CDN.
+          Files uploaded via <span className="text-slate-200 font-medium">Upload File</span> mode
+          are saved to <code className="text-brand text-xs">public/releases/</code> on this server
+          and served directly — no bucket, no cost.
+          For external URLs use <span className="text-slate-200 font-medium">Link URL</span> mode.
         </span>
       </div>
 
@@ -151,7 +147,7 @@ export default function ReleasesPage() {
             <Upload size={14} className="text-brand" />
           </div>
           <h2 className="font-semibold text-slate-100 text-sm">New Release</h2>
-          <span className="ml-auto text-xs text-slate-500">Uploads via server · service role key</span>
+          <span className="ml-auto text-xs text-slate-500">Saved to public/releases/ on server</span>
         </div>
 
         {/* Mode toggle */}
@@ -213,7 +209,7 @@ export default function ReleasesPage() {
                   <Upload size={20} className="text-slate-400" />
                 </div>
                 <p className="text-slate-300 text-sm font-medium">Drop your file here</p>
-                <p className="text-slate-500 text-xs mt-1">.exe · .dmg · .apk · .ipa · .zip</p>
+                <p className="text-slate-500 text-xs mt-1">.exe · .dmg · .apk · .ipa · .zip · any size</p>
               </div>
             )}
           </div>

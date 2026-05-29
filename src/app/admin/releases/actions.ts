@@ -1,7 +1,12 @@
 "use server";
 
+import { writeFile, mkdir, unlink } from "fs/promises";
+import { existsSync } from "fs";
+import path from "path";
 import { createServiceClient } from "@/lib/supabase/service";
 import { revalidatePath } from "next/cache";
+
+const RELEASES_DIR = path.join(process.cwd(), "public", "releases");
 
 function guessFileName(url: string): string {
   try { return decodeURIComponent(new URL(url).pathname.split("/").pop() || url); }
@@ -17,7 +22,6 @@ export async function publishReleaseAction(formData: FormData) {
 
   if (!version) throw new Error("Version is required.");
 
-  const sb = createServiceClient();
   let fileUrl = "";
   let fileName = "";
   let fileSize = 0;
@@ -26,18 +30,14 @@ export async function publishReleaseAction(formData: FormData) {
     const file = formData.get("file") as File | null;
     if (!file || file.size === 0) throw new Error("No file provided.");
 
-    const bytes = await file.arrayBuffer();
     const sanitized = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-    const path = `releases/${platform}/${version}/${sanitized}`;
+    const dir = path.join(RELEASES_DIR, platform, version);
+    await mkdir(dir, { recursive: true });
 
-    const { error: upErr } = await sb.storage
-      .from("release")
-      .upload(path, bytes, { contentType: file.type, upsert: true });
+    const bytes = await file.arrayBuffer();
+    await writeFile(path.join(dir, sanitized), Buffer.from(bytes));
 
-    if (upErr) throw new Error(upErr.message);
-
-    const { data: urlData } = sb.storage.from("release").getPublicUrl(path);
-    fileUrl = urlData.publicUrl;
+    fileUrl = `/releases/${platform}/${version}/${sanitized}`;
     fileName = file.name;
     fileSize = file.size;
   } else {
@@ -46,15 +46,15 @@ export async function publishReleaseAction(formData: FormData) {
     fileName = guessFileName(fileUrl);
   }
 
-  const { error: dbErr } = await sb.from("app_releases").insert({
+  const sb = createServiceClient();
+  const { error } = await sb.from("app_releases").insert({
     version, platform, channel,
     file_name: fileName,
     file_size: fileSize,
     file_url: fileUrl,
     release_notes: notes,
   });
-
-  if (dbErr) throw new Error(dbErr.message);
+  if (error) throw new Error(error.message);
 
   revalidatePath("/admin/releases");
 }
@@ -62,20 +62,22 @@ export async function publishReleaseAction(formData: FormData) {
 export async function deleteReleaseAction(id: string, fileUrl: string) {
   const sb = createServiceClient();
   await sb.from("app_releases").delete().eq("id", id);
-  try {
-    const path = new URL(fileUrl).pathname.split("/object/public/release/")[1];
-    if (path) await sb.storage.from("release").remove([path]);
-  } catch { /* external URL — nothing to remove from bucket */ }
+
+  // Only delete local files (relative URLs starting with /releases/)
+  if (fileUrl.startsWith("/releases/")) {
+    const filePath = path.join(process.cwd(), "public", fileUrl);
+    if (existsSync(filePath)) await unlink(filePath).catch(() => {});
+  }
+
   revalidatePath("/admin/releases");
 }
 
 export async function fetchReleasesAction() {
   const sb = createServiceClient();
-  const { data, error } = await sb
+  const { data } = await sb
     .from("app_releases")
     .select("*")
     .order("created_at", { ascending: false })
     .limit(30);
-  if (error) return [];
   return data ?? [];
 }
