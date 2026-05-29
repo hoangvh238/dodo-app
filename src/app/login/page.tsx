@@ -22,7 +22,7 @@ export default function LoginPage() {
       setError(error.message);
       setLoading(false);
     } else {
-      router.push("/");
+      router.push("/admin");
       router.refresh();
     }
   }
@@ -31,8 +31,10 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-bg-base">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <div className="text-4xl mb-3">📊</div>
-          <h1 className="text-2xl font-bold text-slate-100">Do It Analytics</h1>
+          <div className="w-12 h-12 rounded-xl bg-brand/15 flex items-center justify-center mx-auto mb-3">
+            <span className="text-brand font-bold text-xl">D</span>
+          </div>
+          <h1 className="text-2xl font-bold text-slate-100">DoDo Analytics</h1>
           <p className="text-slate-400 text-sm mt-1">Internal dashboard — authorized access only</p>
         </div>
 

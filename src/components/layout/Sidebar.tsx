@@ -1,16 +1,18 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Globe, Activity, Users, LogOut } from "lucide-react";
+import { LayoutDashboard, Globe, Activity, Users, LogOut, Package, ShieldAlert } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 
 const NAV = [
-  { href: "/", label: "Overview", icon: LayoutDashboard },
-  { href: "/map", label: "Live Map", icon: Globe },
-  { href: "/events", label: "Events", icon: Activity },
-  { href: "/sessions", label: "Sessions", icon: Users },
+  { href: "/admin", label: "Overview", icon: LayoutDashboard },
+  { href: "/admin/map", label: "Live Map", icon: Globe },
+  { href: "/admin/events", label: "Events", icon: Activity },
+  { href: "/admin/sessions", label: "Sessions", icon: Users },
+  { href: "/admin/releases", label: "Releases", icon: Package },
+  { href: "/admin/version-config", label: "Version Control", icon: ShieldAlert },
 ];
 
 export default function Sidebar() {
@@ -28,9 +30,11 @@ export default function Sidebar() {
     <aside className="w-56 flex flex-col bg-bg-card border-r border-slate-700 shrink-0">
       <div className="px-5 py-5 border-b border-slate-700">
         <div className="flex items-center gap-2.5">
-          <span className="text-2xl">📊</span>
+          <div className="w-7 h-7 rounded-md bg-brand/20 flex items-center justify-center">
+            <span className="text-brand text-xs font-bold">D</span>
+          </div>
           <div>
-            <p className="font-semibold text-slate-100 text-sm leading-tight">Do It</p>
+            <p className="font-semibold text-slate-100 text-sm leading-tight">DoDo</p>
             <p className="text-xs text-slate-400">Analytics</p>
           </div>
         </div>
@@ -38,7 +42,10 @@ export default function Sidebar() {
 
       <nav className="flex-1 p-3 space-y-0.5">
         {NAV.map(({ href, label, icon: Icon }) => {
-          const active = pathname === href || (href !== "/" && pathname.startsWith(href));
+          const active =
+            href === "/admin"
+              ? pathname === "/admin"
+              : pathname.startsWith(href);
           return (
             <Link
               key={href}

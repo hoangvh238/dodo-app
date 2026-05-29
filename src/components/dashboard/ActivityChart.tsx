@@ -16,13 +16,17 @@ interface Props {
 
 function CustomTooltip({ active, payload, label }: {
   active?: boolean;
-  payload?: Array<{ value: number }>;
+  payload?: Array<{ value: number; payload?: { date?: string } }>;
   label?: string;
 }) {
   if (!active || !payload?.length) return null;
+  const rawDate = payload[0]?.payload?.date;
+  const displayDate = rawDate
+    ? format(parseISO(rawDate), "MMM d, yyyy")
+    : (label ?? "");
   return (
     <div className="bg-bg-card border border-slate-700 rounded-lg px-3 py-2 shadow-xl">
-      <p className="text-xs text-slate-400">{label ? format(parseISO(label), "MMM d, yyyy") : ""}</p>
+      <p className="text-xs text-slate-400">{displayDate}</p>
       <p className="text-sm font-semibold text-slate-100">{payload[0].value} events</p>
     </div>
   );
