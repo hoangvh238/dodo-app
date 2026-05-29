@@ -22,17 +22,17 @@ function markerColor(count: number, max: number) {
   return "#3B82F6";
 }
 
+type LeafletContainer = HTMLDivElement & { _leaflet_id?: number };
+
 export default function MapInner({ points }: Props) {
-  const containerRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<LeafletContainer>(null);
 
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
     // Clear any stale Leaflet instance left on this DOM node (Strict Mode / HMR)
-    if ((container as any)._leaflet_id) {
-      delete (container as any)._leaflet_id;
-    }
+    delete container._leaflet_id;
 
     const maxCount = points[0]?.count ?? 1;
 
