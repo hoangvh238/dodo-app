@@ -11,6 +11,11 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "DoDo — AI that lives on your screen",
   description: "Press one shortcut. Select any area. Get instant AI help without leaving what you're doing.",
+  icons: {
+    icon: "/icon.ico",
+    shortcut: "/icon.ico",
+    apple: "/icon.png",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
