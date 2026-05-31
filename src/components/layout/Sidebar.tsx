@@ -3,7 +3,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Globe, Activity, Users, LogOut,
-  Package, ShieldAlert, UserCircle2, ChevronRight,
+  Package, ShieldAlert, UserCircle2, ChevronRight, Rocket,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
@@ -25,6 +25,7 @@ const NAV_GROUPS = [
     items: [
       { href: "/admin/releases",       label: "Releases",        icon: Package },
       { href: "/admin/version-config", label: "Version Control", icon: ShieldAlert },
+      { href: "/admin/beta-launch",    label: "Beta Launch",     icon: Rocket },
     ],
   },
 ];

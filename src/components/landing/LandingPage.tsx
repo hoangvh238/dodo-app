@@ -184,6 +184,222 @@ function TiltCard({ children, className = "", style = {} }: {
   );
 }
 
+// ─── Beta countdown hook ───
+function useCountdown(targetDate: string | null | undefined) {
+  const calc = useCallback(() => {
+    if (!targetDate) return null;
+    const diff = new Date(targetDate).getTime() - Date.now();
+    if (diff <= 0) return null;
+    return {
+      days: Math.floor(diff / 86400000),
+      hours: Math.floor((diff % 86400000) / 3600000),
+      minutes: Math.floor((diff % 3600000) / 60000),
+      seconds: Math.floor((diff % 60000) / 1000),
+    };
+  }, [targetDate]);
+
+  const [time, setTime] = useState(calc);
+  useEffect(() => {
+    setTime(calc());
+    if (!targetDate) return;
+    const t = setInterval(() => setTime(calc()), 1000);
+    return () => clearInterval(t);
+  }, [targetDate, calc]);
+
+  return time;
+}
+
+// ─── Countdown digit block ───
+function CountdownUnit({ value, label }: { value: number; label: string }) {
+  return (
+    <motion.div className="flex flex-col items-center gap-2" whileHover={{ scale: 1.05 }}>
+      <div
+        className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-2xl flex items-center justify-center overflow-hidden"
+        style={{
+          background: "rgba(99,102,241,0.08)",
+          border: "1px solid rgba(99,102,241,0.3)",
+          boxShadow: "0 0 30px rgba(99,102,241,0.12), inset 0 1px 0 rgba(255,255,255,0.05)",
+        }}
+      >
+        <AnimatePresence mode="popLayout">
+          <motion.span
+            key={value}
+            initial={{ y: -18, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 18, opacity: 0 }}
+            transition={{ duration: 0.22, ease: [0.22, 1, 0.36, 1] }}
+            className="font-bold text-white font-mono"
+            style={{ fontSize: "clamp(22px,4vw,30px)", letterSpacing: "-2px" }}
+          >
+            {String(value).padStart(2, "0")}
+          </motion.span>
+        </AnimatePresence>
+      </div>
+      <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.28)" }}>
+        {label}
+      </span>
+    </motion.div>
+  );
+}
+
+// ─── Beta launch section ───
+interface BetaConfig {
+  phase: string;
+  launch_date: string | null;
+  announcement: string | null;
+  beta_slots: number;
+}
+
+const BETA_PERKS = [
+  "100% free during beta",
+  "Early adopter badge at v1.0",
+  "Unlimited queries & features",
+  "Shape the product directly",
+];
+
+function BetaSection({ downloadUrl, betaConfig }: { downloadUrl: string; betaConfig: BetaConfig | null }) {
+  const time = useCountdown(betaConfig?.launch_date);
+  const hasCountdown = !!time;
+  const [betaUsers, setBetaUsers] = useState(2_412);
+
+  useEffect(() => {
+    const t = setInterval(() => setBetaUsers(p => p + (Math.random() > 0.5 ? 1 : 0)), 8000);
+    return () => clearInterval(t);
+  }, []);
+
+  return (
+    <section className="relative py-24 px-5 overflow-hidden" style={{ background: "#06060e" }}>
+      {/* BG radial glow */}
+      <div className="pointer-events-none absolute inset-0"
+        style={{ background: "radial-gradient(ellipse 85% 65% at 50% 50%, rgba(99,102,241,0.15) 0%, transparent 62%)" }} />
+      <div className="pointer-events-none absolute inset-0 grid-bg" style={{ opacity: 0.35 }} />
+      <Particles count={18} />
+
+      {/* Edge lines */}
+      <div className="absolute top-0 inset-x-0 h-px"
+        style={{ background: "linear-gradient(90deg, transparent 5%, rgba(99,102,241,0.55) 50%, transparent 95%)" }} />
+      <div className="absolute bottom-0 inset-x-0 h-px"
+        style={{ background: "linear-gradient(90deg, transparent 10%, rgba(99,102,241,0.25) 50%, transparent 90%)" }} />
+
+      <div className="relative z-10 max-w-4xl mx-auto text-center">
+
+        {/* Live badge */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+          className="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full text-xs font-bold mb-8"
+          style={{
+            background: "rgba(34,197,94,0.07)",
+            border: "1px solid rgba(34,197,94,0.22)",
+            color: "#4ade80",
+          }}
+        >
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
+          </span>
+          EARLY ACCESS BETA
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded" style={{ background: "rgba(34,197,94,0.15)", color: "#4ade80" }}>
+            {betaUsers.toLocaleString()} joined
+          </span>
+        </motion.div>
+
+        {/* Heading */}
+        <Fade>
+          <h2 className="font-bold text-white mb-5"
+            style={{ fontSize: "clamp(32px, 6vw, 68px)", letterSpacing: "-0.045em", lineHeight: 1.06 }}>
+            {hasCountdown ? (
+              <>
+                Beta access closes{" "}
+                <span style={{
+                  background: `linear-gradient(135deg, ${IND_BRIGHT} 0%, #a78bfa 100%)`,
+                  WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text",
+                }}>in</span>
+              </>
+            ) : (
+              <>
+                Free access,{" "}
+                <span style={{
+                  background: `linear-gradient(135deg, ${IND_BRIGHT} 0%, #a78bfa 100%)`,
+                  WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text",
+                }}>limited time.</span>
+              </>
+            )}
+          </h2>
+
+          {betaConfig?.announcement && (
+            <p className="max-w-lg mx-auto mb-10 text-lg" style={{ color: "rgba(255,255,255,0.48)", letterSpacing: "-0.2px" }}>
+              {betaConfig.announcement}
+            </p>
+          )}
+        </Fade>
+
+        {/* Countdown */}
+        {hasCountdown && time && (
+          <Fade delay={0.1} className="flex items-end justify-center gap-3 sm:gap-5 mb-12">
+            <CountdownUnit value={time.days} label="Days" />
+            <span className="font-bold mb-6 sm:mb-8" style={{ fontSize: "clamp(24px,4vw,36px)", color: "rgba(255,255,255,0.18)" }}>:</span>
+            <CountdownUnit value={time.hours} label="Hours" />
+            <span className="font-bold mb-6 sm:mb-8" style={{ fontSize: "clamp(24px,4vw,36px)", color: "rgba(255,255,255,0.18)" }}>:</span>
+            <CountdownUnit value={time.minutes} label="Mins" />
+            <span className="font-bold mb-6 sm:mb-8" style={{ fontSize: "clamp(24px,4vw,36px)", color: "rgba(255,255,255,0.18)" }}>:</span>
+            <CountdownUnit value={time.seconds} label="Secs" />
+          </Fade>
+        )}
+
+        {!hasCountdown && <div className="mb-10" />}
+
+        {/* Perks */}
+        <Fade delay={0.15} className="flex flex-wrap justify-center gap-2.5 mb-10">
+          {BETA_PERKS.map(perk => (
+            <motion.span
+              key={perk}
+              whileHover={{ scale: 1.04, borderColor: "rgba(99,102,241,0.45)" }}
+              className="flex items-center gap-1.5 text-sm px-4 py-2 rounded-full cursor-default transition-colors"
+              style={{
+                background: "rgba(99,102,241,0.07)",
+                border: "1px solid rgba(99,102,241,0.18)",
+                color: "rgba(255,255,255,0.68)",
+              }}
+            >
+              <span style={{ color: IND_BRIGHT }}>✓</span> {perk}
+            </motion.span>
+          ))}
+        </Fade>
+
+        {/* CTA */}
+        <Fade delay={0.2} className="flex flex-col items-center gap-3">
+          <Magnetic strength={0.4}>
+            <motion.a
+              href={downloadUrl}
+              whileHover={{ scale: 1.06, boxShadow: "0 0 80px rgba(99,102,241,0.7)" }}
+              whileTap={{ scale: 0.93 }}
+              className="flex items-center gap-3 px-9 py-4 rounded-full font-bold text-white"
+              style={{
+                background: `linear-gradient(135deg, ${IND} 0%, #7c3aed 100%)`,
+                fontSize: "clamp(14px,1.8vw,16px)",
+                boxShadow: "0 0 45px rgba(99,102,241,0.45)",
+                letterSpacing: "-0.25px",
+              }}
+            >
+              <svg width="17" height="17" viewBox="0 0 17 17" fill="none">
+                <path d="M8.5 1.5v10M4 8l4.5 5L13 8M1.5 14.5h14" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              Download for Windows — Free
+            </motion.a>
+          </Magnetic>
+          <p className="text-xs" style={{ color: "rgba(255,255,255,0.2)" }}>
+            Windows 10/11 · No sign-up · No credit card
+          </p>
+        </Fade>
+
+      </div>
+    </section>
+  );
+}
+
 // ─── Number scramble counter ───
 const CHARS = "0123456789";
 function ScrambleCounter({ to, suffix = "", decimals = 0 }: { to: number; suffix?: string; decimals?: number }) {
@@ -799,7 +1015,7 @@ function AppDemo() {
 }
 
 // ─── Nav ───
-function Nav() {
+function Nav({ downloadUrl }: { downloadUrl: string }) {
   const [scrolled, setScrolled] = useState(false);
   useEffect(() => {
     const h = () => setScrolled(window.scrollY > 50);
@@ -834,7 +1050,7 @@ function Nav() {
           ))}
         </div>
         <Magnetic>
-          <motion.a href="#download" whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.94 }}
+          <motion.a href={downloadUrl} whileHover={{ scale: 1.06 }} whileTap={{ scale: 0.94 }}
             className="flex items-center gap-2 text-xs font-semibold text-white px-4 py-2 rounded-full"
             style={{ background: IND, boxShadow: "0 0 20px rgba(99,102,241,0.35)", letterSpacing: "-0.1px" }}>
             Download Free
@@ -1006,8 +1222,8 @@ function UseCaseTabs() {
 }
 
 // ─── Pricing ───
-function PricingCard({ plan, price, period, features, cta, highlighted, badge }: {
-  plan: string; price: string; period: string; features: string[]; cta: string; highlighted?: boolean; badge?: string;
+function PricingCard({ plan, price, period, features, cta, highlighted, badge, downloadUrl = "#" }: {
+  plan: string; price: string; period: string; features: string[]; cta: string; highlighted?: boolean; badge?: string; downloadUrl?: string;
 }) {
   return (
     <TiltCard>
@@ -1042,7 +1258,7 @@ function PricingCard({ plan, price, period, features, cta, highlighted, badge }:
           ))}
         </ul>
         <Magnetic>
-          <motion.a href="#download" whileTap={{ scale: 0.95 }}
+          <motion.a href={highlighted ? downloadUrl : "#pricing"} whileTap={{ scale: 0.95 }}
             className="block w-full py-3 px-4 rounded-full text-sm font-semibold text-center"
             style={{
               background: highlighted ? IND : "rgba(255,255,255,0.07)",
@@ -1065,6 +1281,26 @@ export default function LandingPage() {
   const demoY = useTransform(scrollY, [0, 700], [0, 60]);
   const heroOpacity = useTransform(scrollY, [0, 500], [1, 0.4]);
 
+  // Dynamic download URL + version from /api/version
+  const [downloadUrl, setDownloadUrl] = useState<string>("#");
+  const [latestVersion, setLatestVersion] = useState<string>("1.0");
+  const [betaConfig, setBetaConfig] = useState<BetaConfig | null>(null);
+
+  useEffect(() => {
+    fetch("/api/version")
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (d?.downloadUrl) setDownloadUrl(d.downloadUrl);
+        if (d?.latestVersion) setLatestVersion(d.latestVersion);
+      })
+      .catch(() => {});
+
+    fetch("/api/beta-config")
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d) setBetaConfig(d); })
+      .catch(() => {});
+  }, []);
+
   // Live query counter
   const [liveCount, setLiveCount] = useState(2_318_441);
   useEffect(() => {
@@ -1075,7 +1311,7 @@ export default function LandingPage() {
   return (
     <div style={{ background: BG, color: "#f8fafc", fontFamily: "var(--font-inter)" }}>
       <CursorGlow />
-      <Nav />
+      <Nav downloadUrl={downloadUrl} />
 
       {/* ═══ HERO ═══ */}
       <section className="relative flex flex-col items-center justify-center text-center overflow-hidden min-h-screen px-5 pt-24 pb-20"
@@ -1133,8 +1369,7 @@ export default function LandingPage() {
           >
             <Magnetic strength={0.4}>
               <motion.a
-                href="#download"
-                id="download"
+                href={downloadUrl}
                 whileHover={{ scale: 1.06, boxShadow: "0 0 50px rgba(99,102,241,0.6)" }}
                 whileTap={{ scale: 0.93 }}
                 className="flex items-center gap-2.5 px-7 py-3.5 rounded-full font-semibold text-white text-sm"
@@ -1159,7 +1394,7 @@ export default function LandingPage() {
           </motion.div>
           <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.1 }}
             className="text-xs" style={{ color: "rgba(255,255,255,0.25)" }}>
-            Windows 10/11 · Electron 29 · v0.9.2-beta · 68 MB · No sign-up required
+            Windows 10/11 · v{latestVersion}-beta · No sign-up required
           </motion.p>
         </motion.div>
 
@@ -1195,6 +1430,9 @@ export default function LandingPage() {
           </motion.div>
         </motion.div>
       </section>
+
+      {/* ═══ BETA LAUNCH ═══ */}
+      <BetaSection downloadUrl={downloadUrl} betaConfig={betaConfig} />
 
       {/* ═══ PROBLEM ═══ */}
       <section className="py-24 px-5" style={{ background: "#0b0b16" }}>
@@ -1407,7 +1645,7 @@ export default function LandingPage() {
                 features={["50 queries / month", "2 AI profiles", "Basic commands only", "7-day history", "Windows only"]} />
             </Fade>
             <Fade delay={0.08}>
-              <PricingCard plan="Pro" price="$9" period="/mo" highlighted badge="Most popular" cta="Start Pro Trial"
+              <PricingCard plan="Pro" price="$9" period="/mo" highlighted badge="Most popular" cta="Start Pro Trial" downloadUrl={downloadUrl}
                 features={["Unlimited queries", "5 profiles + custom", "All MCP tools", "Claude Sonnet & GPT-4o", "Unlimited history", "Priority support"]} />
             </Fade>
             <Fade delay={0.16}>
@@ -1440,7 +1678,7 @@ export default function LandingPage() {
               See something. Ask AI instantly. Right on your screen.
             </p>
             <Magnetic strength={0.3}>
-              <motion.a href="#download"
+              <motion.a href={downloadUrl}
                 whileHover={{ scale: 1.07, boxShadow: "0 0 70px rgba(99,102,241,0.7)" }}
                 whileTap={{ scale: 0.93 }}
                 className="inline-flex items-center gap-3 px-9 py-4 rounded-full font-bold text-white text-base"
@@ -1452,7 +1690,7 @@ export default function LandingPage() {
               </motion.a>
             </Magnetic>
             <p className="mt-5 text-xs" style={{ color: "rgba(255,255,255,0.2)" }}>
-              Windows 10/11 · v0.9.2-beta · 68 MB · No sign-up required
+              Windows 10/11 · v{latestVersion}-beta · No sign-up required
             </p>
           </Fade>
         </div>
