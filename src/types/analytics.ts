@@ -47,6 +47,7 @@ export interface Event {
 export interface OverviewStats {
   totalEvents: number;
   totalSessions: number;
+  uniqueUsers: number;
   uniqueCountries: number;
   todayEvents: number;
   activeSessionsLast24h: number;
@@ -61,4 +62,32 @@ export interface GeoPoint {
   country: string;
   city: string;
   count: number;
+}
+
+export interface IpUser {
+  ip_address: string;
+  country: string | null;
+  country_code: string | null;
+  region: string | null;
+  city: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  session_count: number;
+  total_events: number;
+  first_seen: string;
+  last_seen: string;
+}
+
+export interface IpUserProfile extends IpUser {
+  versions: string[];
+  platforms: string[];
+}
+
+export interface UserSession {
+  id: string;
+  app_version: string | null;
+  os_platform: string | null;
+  started_at: string;
+  last_seen_at: string;
+  events_count: number;
 }

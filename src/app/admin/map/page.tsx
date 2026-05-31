@@ -9,13 +9,20 @@ async function getGeoPoints(): Promise<GeoPoint[]> {
     .from("sessions")
     .select("latitude, longitude, country, city")
     .not("latitude", "is", null)
-    .not("longitude", "is", null);
+    .not("longitude", "is", null)
+    .limit(5000);
 
   const clusters: Record<string, GeoPoint> = {};
   for (const s of data ?? []) {
     const key = `${(s.latitude as number).toFixed(1)},${(s.longitude as number).toFixed(1)}`;
     if (!clusters[key]) {
-      clusters[key] = { lat: s.latitude as number, lon: s.longitude as number, country: s.country ?? "Unknown", city: s.city ?? "Unknown", count: 0 };
+      clusters[key] = {
+        lat: s.latitude as number,
+        lon: s.longitude as number,
+        country: s.country ?? "Unknown",
+        city: s.city ?? "Unknown",
+        count: 0,
+      };
     }
     clusters[key].count++;
   }
@@ -28,10 +35,15 @@ export default async function MapPage() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-2xl font-bold text-slate-100">Geographic Map</h1>
-        <p className="text-slate-400 text-sm mt-0.5">{points.length} unique locations · IP-based geolocation</p>
+        <h1 className="text-2xl font-bold text-slate-100">Live Map</h1>
+        <p className="text-slate-500 text-sm mt-0.5">
+          {points.length} unique locations · IP-based geolocation
+        </p>
       </div>
-      <div className="bg-bg-card border border-slate-700 rounded-xl overflow-hidden" style={{ height: "calc(100vh - 220px)" }}>
+      <div
+        className="rounded-2xl border border-white/[0.06] overflow-hidden"
+        style={{ height: "calc(100vh - 220px)" }}
+      >
         <GeoMap points={points} />
       </div>
     </div>

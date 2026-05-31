@@ -81,3 +81,46 @@ export async function fetchReleasesAction() {
     .limit(30);
   return data ?? [];
 }
+
+export async function promoteReleaseAction(id: string) {
+  const sb = createServiceClient();
+
+  const { data: release, error: fetchErr } = await sb
+    .from("app_releases")
+    .select("version, file_url, release_notes")
+    .eq("id", id)
+    .single();
+
+  if (fetchErr || !release) throw new Error("Release not found");
+
+  // Find existing active config so we can preserve min_version, build_hash, etc.
+  const { data: existing } = await sb
+    .from("app_version_config")
+    .select("id, min_version, build_hash, custom_message, is_blocked")
+    .eq("is_active", true)
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .single();
+
+  const payload = {
+    latest_version: release.version,
+    download_url: release.file_url,
+    release_notes: release.release_notes ?? "",
+    is_active: true,
+    // preserve existing gate config if present
+    min_version: existing?.min_version ?? release.version,
+    build_hash: existing?.build_hash ?? null,
+    custom_message: existing?.custom_message ?? null,
+    is_blocked: existing?.is_blocked ?? false,
+  };
+
+  let error;
+  if (existing?.id) {
+    ({ error } = await sb.from("app_version_config").update(payload).eq("id", existing.id));
+  } else {
+    ({ error } = await sb.from("app_version_config").insert(payload));
+  }
+
+  if (error) throw new Error(error.message);
+  revalidatePath("/admin/version-config");
+}

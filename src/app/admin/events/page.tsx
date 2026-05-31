@@ -4,7 +4,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 
 async function getEvents(page: number, type?: string) {
   const supabase = createServiceClient();
-  const limit = 50;
+  const limit  = 50;
   const offset = (page - 1) * limit;
 
   let query = supabase
@@ -21,9 +21,8 @@ async function getEvents(page: number, type?: string) {
 
 async function getEventTypes(): Promise<string[]> {
   const supabase = createServiceClient();
-  const { data } = await supabase.from("events").select("event_type");
-  const types = [...new Set((data ?? []).map((e) => e.event_type))].sort();
-  return types;
+  const { data } = await supabase.rpc("get_distinct_event_types");
+  return (data ?? []).map((r: { event_type: string }) => r.event_type);
 }
 
 export default async function EventsPage({

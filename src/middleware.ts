@@ -40,5 +40,6 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*"],
+  // Match all /admin/* routes EXCEPT /admin/releases (file upload — body too large for middleware)
+  matcher: ["/admin/((?!releases(?:/|$)).*)"],
 };

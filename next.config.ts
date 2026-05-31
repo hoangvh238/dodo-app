@@ -2,6 +2,12 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  experimental: {
+    serverActions: {
+      bodySizeLimit: "500mb",
+    },
+  },
+  middlewareClientMaxBodySize: "500mb",
   async headers() {
     return [
       {

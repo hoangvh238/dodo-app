@@ -9,74 +9,49 @@ export async function GET() {
   const todayISO = today.toISOString();
   const ago24h = new Date(Date.now() - 86400 * 1000).toISOString();
   const ago30d = new Date(Date.now() - 30 * 86400 * 1000).toISOString();
+  const now = new Date().toISOString();
 
   const [
     { count: totalEvents },
     { count: totalSessions },
     { count: todayEvents },
     { count: activeSessions },
-    { data: eventTypes },
-    { data: countries },
-    { data: timeSeries },
+    { data: eventTypesRaw },
+    { data: countriesRaw },
+    { data: timeSeriesRaw },
+    { data: uniqueUsersRaw },
   ] = await Promise.all([
     supabase.from("events").select("*", { count: "exact", head: true }),
     supabase.from("sessions").select("*", { count: "exact", head: true }),
     supabase.from("events").select("*", { count: "exact", head: true }).gte("created_at", todayISO),
     supabase.from("sessions").select("*", { count: "exact", head: true }).gte("last_seen_at", ago24h),
-    supabase
-      .from("events")
-      .select("event_type")
-      .gte("created_at", ago30d)
-      .order("event_type"),
-    supabase
-      .from("sessions")
-      .select("country, country_code")
-      .not("country", "is", null),
-    supabase
-      .from("events")
-      .select("created_at")
-      .gte("created_at", ago30d)
-      .order("created_at"),
+    supabase.rpc("get_event_type_counts", { from_date: ago30d, to_date: now }),
+    supabase.rpc("get_top_countries", { lim: 10 }),
+    supabase.rpc("get_events_over_time", { from_date: ago30d, to_date: now }),
+    supabase.rpc("count_ip_users", { p_search: null }),
   ]);
 
-  // Aggregate event types
-  const typeMap: Record<string, number> = {};
-  for (const e of eventTypes ?? []) {
-    typeMap[e.event_type] = (typeMap[e.event_type] ?? 0) + 1;
-  }
-  const topEventTypes = Object.entries(typeMap)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 8)
-    .map(([type, count]) => ({ type, count }));
+  const topEventTypes = (eventTypesRaw ?? []).map(
+    (r: { event_type: string; cnt: number }) => ({ type: r.event_type, count: r.cnt })
+  );
 
-  // Aggregate countries
-  const countryMap: Record<string, { country: string; country_code: string; count: number }> = {};
-  for (const s of countries ?? []) {
-    if (!s.country) continue;
-    const key = s.country_code ?? s.country;
-    if (!countryMap[key]) {
-      countryMap[key] = { country: s.country, country_code: s.country_code ?? "", count: 0 };
-    }
-    countryMap[key].count++;
-  }
-  const topCountries = Object.values(countryMap)
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 10);
+  const topCountries = (countriesRaw ?? []).map(
+    (r: { country: string; country_code: string; cnt: number }) => ({
+      country: r.country,
+      country_code: r.country_code,
+      count: r.cnt,
+    })
+  );
 
-  // Events over time (daily buckets)
-  const dateMap: Record<string, number> = {};
-  for (const e of timeSeries ?? []) {
-    const d = e.created_at.slice(0, 10);
-    dateMap[d] = (dateMap[d] ?? 0) + 1;
-  }
-  const eventsOverTime = Object.entries(dateMap)
-    .sort((a, b) => a[0].localeCompare(b[0]))
-    .map(([date, count]) => ({ date, count }));
+  const eventsOverTime = (timeSeriesRaw ?? []).map(
+    (r: { day: string; cnt: number }) => ({ date: r.day, count: r.cnt })
+  );
 
   const stats: OverviewStats = {
     totalEvents: totalEvents ?? 0,
     totalSessions: totalSessions ?? 0,
-    uniqueCountries: Object.keys(countryMap).length,
+    uniqueUsers: typeof uniqueUsersRaw === "number" ? uniqueUsersRaw : 0,
+    uniqueCountries: topCountries.length,
     todayEvents: todayEvents ?? 0,
     activeSessionsLast24h: activeSessions ?? 0,
     topEventTypes,

@@ -3,12 +3,13 @@
 import { useState, useRef, useEffect, useTransition } from "react";
 import {
   Upload, Tag, Package, X, CheckCircle2, AlertCircle,
-  Download, Trash2, Clock, Link2, HardDrive,
+  Download, Trash2, Clock, Link2, HardDrive, Zap,
 } from "lucide-react";
 import {
   publishReleaseAction,
   deleteReleaseAction,
   fetchReleasesAction,
+  promoteReleaseAction,
 } from "./actions";
 
 type Platform = "ios" | "android" | "windows" | "macos" | "web";
@@ -70,6 +71,7 @@ export default function ReleasesPage() {
   const [notes, setNotes] = useState("");
   const [status, setStatus] = useState<"idle" | "success" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
+  const [promotedId, setPromotedId] = useState<string | null>(null);
   const [releases, setReleases] = useState<Release[]>([]);
   const [loadingReleases, setLoadingReleases] = useState(true);
   const [isPending, startTransition] = useTransition();
@@ -117,6 +119,18 @@ export default function ReleasesPage() {
     startTransition(async () => {
       await deleteReleaseAction(id, fileUrl);
       loadReleases();
+    });
+  };
+
+  const handlePromote = (id: string) => {
+    startTransition(async () => {
+      try {
+        await promoteReleaseAction(id);
+        setPromotedId(id);
+        setTimeout(() => setPromotedId(null), 3000);
+      } catch {
+        // silently ignore — version-config page will show the error
+      }
     });
   };
 
@@ -304,7 +318,7 @@ export default function ReleasesPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-slate-700">
-                {["Version", "Platform", "Channel", "File", "Size", "Date", ""].map(h => (
+                {["Version", "Platform", "Channel", "File", "Size", "Date", "Active", ""].map(h => (
                   <th key={h} className="px-5 py-3 text-left text-xs font-medium text-slate-400 uppercase tracking-wide">{h}</th>
                 ))}
               </tr>
@@ -325,6 +339,22 @@ export default function ReleasesPage() {
                   <td className="px-5 py-3.5 text-slate-400">{formatBytes(r.file_size)}</td>
                   <td className="px-5 py-3.5 text-slate-500">
                     <span className="flex items-center gap-1"><Clock size={11} />{timeAgo(r.created_at)}</span>
+                  </td>
+                  <td className="px-5 py-3.5">
+                    {promotedId === r.id ? (
+                      <span className="flex items-center gap-1 text-emerald-400 text-xs font-medium">
+                        <CheckCircle2 size={11} /> Promoted
+                      </span>
+                    ) : (
+                      <button
+                        onClick={() => handlePromote(r.id)}
+                        disabled={isPending}
+                        title="Set as active version in manifest"
+                        className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium text-slate-400 border border-slate-700 hover:text-amber-300 hover:border-amber-500/40 hover:bg-amber-500/5 transition-all disabled:opacity-40"
+                      >
+                        <Zap size={11} /> Set Active
+                      </button>
+                    )}
                   </td>
                   <td className="px-5 py-3.5">
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
