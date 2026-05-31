@@ -438,578 +438,135 @@ function Fade({ children, className = "", delay = 0, y = 36 }: {
   );
 }
 
-// ─── Multi-scenario App Demo ───
+// ─── Hero gallery ───
 
-interface Cmd { icon: string; label: string; shortcut: string; highlight?: boolean }
-interface ScenarioDef {
-  id: string; tabIcon: string; tabLabel: string; audience: string;
-  appName: string; titleBarBg: string; appBg: string; isDark: boolean;
-  selTop: number; selHeight: number;
-  popupTop: number; popupLeft: number;
-  commands: Cmd[]; response: string; profile: string; copyLabel: string;
+interface GalleryItem {
+  id: string;
+  title: string | null;
+  file_url: string;
+  file_type: string;
+  sort_order: number;
 }
 
-const SCENARIOS: ScenarioDef[] = [
-  {
-    id: "pdf", tabIcon: "📚", tabLabel: "Student", audience: "Students",
-    appName: "Deep Learning — Chapter 4.pdf",
-    titleBarBg: "#e8e5de", appBg: "#f9f6ef", isDark: false,
-    selTop: 112, selHeight: 68, popupTop: 184, popupLeft: 12,
-    commands: [
-      { icon: "📋", label: "Summarize", shortcut: "↵", highlight: true },
-      { icon: "🗣️", label: "Simplify", shortcut: "2" },
-      { icon: "🃏", label: "Make Flashcard", shortcut: "3" },
-      { icon: "🌐", label: "Translate VN", shortcut: "4" },
-    ],
-    profile: "Study Buddy",
-    response: "**In plain English:**\n\nBackpropagation is how a neural network learns from its mistakes.\n\nIt calculates how much each weight contributed to the error, then nudges every weight in the direction that reduces it.\n\nRepeat millions of times → the network gets smarter.",
-    copyLabel: "Save as flashcard",
-  },
-  {
-    id: "translate", tabIcon: "🌐", tabLabel: "Translate", audience: "Everyone",
-    appName: "The Verge — Chrome",
-    titleBarBg: "#e8eaf6", appBg: "#ffffff", isDark: false,
-    selTop: 100, selHeight: 60, popupTop: 165, popupLeft: 10,
-    commands: [
-      { icon: "🇻🇳", label: "Translate to VN", shortcut: "↵", highlight: true },
-      { icon: "📋", label: "Summarize", shortcut: "2" },
-      { icon: "🔤", label: "Define Terms", shortcut: "3" },
-      { icon: "📝", label: "Rewrite Simpler", shortcut: "4" },
-    ],
-    profile: "Language Coach",
-    response: "**Bản dịch tiếng Việt:**\n\nCác mô hình AI thế hệ tiếp theo đã đạt được hiệu suất vượt ngưỡng con người trong 5 lĩnh vực cốt lõi, theo báo cáo được công bố hôm nay.\n\nĐây là lần đầu tiên các hệ thống này vượt qua chuyên gia ở cả ngôn ngữ lẫn lập luận logic.",
-    copyLabel: "Copy translation",
-  },
-  {
-    id: "email", tabIcon: "📧", tabLabel: "Office", audience: "Office Workers",
-    appName: "Inbox — Outlook",
-    titleBarBg: "#0078d4", appBg: "#ffffff", isDark: false,
-    selTop: 108, selHeight: 72, popupTop: 185, popupLeft: 10,
-    commands: [
-      { icon: "✍️", label: "Draft Reply", shortcut: "↵", highlight: true },
-      { icon: "📋", label: "Summarize", shortcut: "2" },
-      { icon: "🎯", label: "Extract Actions", shortcut: "3" },
-      { icon: "🌐", label: "Translate", shortcut: "4" },
-    ],
-    profile: "Office Pro",
-    response: "Dear Sarah,\n\nThank you for following up on the Q4 timeline.\n\nI can confirm we are on schedule — 87% of milestones are complete and the December 15th delivery date is firm.\n\nI'll send a detailed status report by Friday.\n\nBest regards,",
-    copyLabel: "Copy to clipboard",
-  },
-  {
-    id: "image", tabIcon: "🖼️", tabLabel: "Image AI", audience: "Everyone",
-    appName: "Screenshot — Physics Lecture Notes",
-    titleBarBg: "#1e1e2e", appBg: "#13131f", isDark: true,
-    selTop: 90, selHeight: 130, popupTop: 224, popupLeft: 8,
-    commands: [
-      { icon: "🔍", label: "Explain Diagram", shortcut: "↵", highlight: true },
-      { icon: "📝", label: "Summarize Notes", shortcut: "2" },
-      { icon: "❓", label: "Quiz Me", shortcut: "3" },
-      { icon: "🌐", label: "Translate", shortcut: "4" },
-    ],
-    profile: "Study Buddy",
-    response: "**What this diagram shows:**\n\nThis is a free-body diagram for an inclined plane problem.\n\nForces shown:\n• Weight (mg) pointing down\n• Normal force (N) perpendicular to surface\n• Friction (f) opposing motion up the slope\n\n**To solve:** decompose mg into components parallel and perpendicular to the slope.",
-    copyLabel: "Save explanation",
-  },
-  {
-    id: "code", tabIcon: "💻", tabLabel: "Developer", audience: "Developers",
-    appName: "fetchUser.ts — VS Code",
-    titleBarBg: "#161b22", appBg: "#0d1117", isDark: true,
-    selTop: 120, selHeight: 48, popupTop: 172, popupLeft: 6,
-    commands: [
-      { icon: "⚡", label: "Explain Error", shortcut: "↵", highlight: true },
-      { icon: "🔧", label: "Fix Code", shortcut: "2" },
-      { icon: "📖", label: "Search Docs", shortcut: "3" },
-      { icon: "📋", label: "Copy Stacktrace", shortcut: "4" },
-    ],
-    profile: "General",
-    response: "This TypeError happens because `db.query()` is async but you forgot **await**.\n\nVariable `rows` holds a Promise — not real data — so `rows.length` is undefined.\n\n**Fix:**\nAdd `await` before db.query(). Done.",
-    copyLabel: "Copy fix",
-  },
-];
+function HeroGallery({ items }: { items: GalleryItem[] }) {
+  const [current, setCurrent] = useState(0);
+  const [paused, setPaused] = useState(false);
+  // ms: set to 90% of video duration on load, or 6000 for images/gifs
+  const [slideDuration, setSlideDuration] = useState(6000);
 
-// ─── Content renderers per scenario ───
-function CodeAppContent() {
-  const lines = [
-    [{ t: "import ", c: "keyword" }, { t: "{ db }", c: "" }, { t: " from ", c: "keyword" }, { t: "'./database'", c: "string" }],
-    [] as { t: string; c: string }[],
-    [{ t: "async function ", c: "keyword" }, { t: "fetchUser", c: "function" }, { t: "(id: number) {", c: "" }],
-    [{ t: "  const ", c: "keyword" }, { t: "rows", c: "" }, { t: " = db.", c: "" }, { t: "query", c: "function" }, { t: "('SELECT * FROM users WHERE id=$1', [id]);", c: "string" }],
-    [{ t: "  if (!", c: "" }, { t: "rows", c: "error" }, { t: ".length) throw new ", c: "" }, { t: "Error", c: "function" }, { t: "(", c: "" }, { t: "'Not found'", c: "string" }, { t: ");", c: "" }],
-    [{ t: "  return ", c: "keyword" }, { t: "rows[0];", c: "" }],
-    [{ t: "}", c: "" }],
-    [] as { t: string; c: string }[],
-    [{ t: "// 💥 TypeError: Cannot read properties of undefined", c: "error" }],
-    [{ t: "//    reading 'length'  at fetchUser (app.ts:5:9)", c: "error" }],
-  ];
-  return (
-    <div className="flex h-full" style={{ fontFamily: "monospace", fontSize: 12.5 }}>
-      <div className="pt-3.5 text-right pr-3 select-none shrink-0" style={{ color: "#3d4450", minWidth: 36 }}>
-        {lines.map((_, i) => <div key={i} className="leading-6">{i + 1}</div>)}
-      </div>
-      <div className="flex-1 pt-3.5 px-2 overflow-hidden">
-        {lines.map((line, i) => (
-          <div key={i} className="leading-6 whitespace-nowrap">
-            {line.map((tok, j) => (
-              <span key={j} className={
-                tok.c === "keyword" ? "code-keyword" : tok.c === "function" ? "code-function" :
-                tok.c === "string" ? "code-string" : tok.c === "error" ? "code-error" : "text-slate-300"
-              }>{tok.t}</span>
-            ))}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
+  // Reset duration to 6s default whenever we change slides
+  useEffect(() => {
+    const item = items[current];
+    const isVid = item && ["mp4", "webm", "mov"].includes(item.file_type);
+    if (!isVid) setSlideDuration(6000);
+  }, [current, items]);
 
-function PDFAppContent() {
-  return (
-    <div style={{ fontFamily: "Georgia, 'Times New Roman', serif", fontSize: 11.5, color: "#2a2a2a", padding: "16px 20px", lineHeight: 1.7 }}>
-      <div style={{ textAlign: "center", marginBottom: 10 }}>
-        <p style={{ fontSize: 10, color: "#888", letterSpacing: "0.05em", textTransform: "uppercase" }}>Chapter 4 · Optimization Algorithms</p>
-        <p style={{ fontSize: 13, fontWeight: 700, marginTop: 4 }}>4.2 Backpropagation and Gradient Descent</p>
-      </div>
-      <p style={{ textAlign: "justify", marginBottom: 8, color: "#444" }}>
-        The backpropagation algorithm, introduced by Rumelhart, Hinton and Williams (1986), provides an efficient method for computing the gradient of the loss function with respect to all weights in the network using the chain rule of calculus.
-      </p>
-      <p style={{ textAlign: "justify", background: "rgba(255,220,50,0.25)", padding: "4px 2px", borderRadius: 2 }}>
-        Formally, given a loss L and weight wᵢⱼ, the update rule is: Δwᵢⱼ = −η · ∂L/∂wᵢⱼ where η denotes the learning rate. This partial derivative is computed by propagating error signals backwards through each layer, hence the name &ldquo;backpropagation.&rdquo;
-      </p>
-      <p style={{ textAlign: "justify", marginTop: 8, color: "#555", fontSize: 10.5 }}>
-        In practice, stochastic gradient descent (SGD) and its variants (Adam, RMSProp, AdaGrad) are used to handle large datasets by approximating the true gradient using mini-batches...
-      </p>
-    </div>
-  );
-}
+  // Auto-advance — uses setTimeout so it reacts to slideDuration updates
+  useEffect(() => {
+    if (items.length <= 1 || paused) return;
+    const t = setTimeout(() => setCurrent(c => (c + 1) % items.length), slideDuration);
+    return () => clearTimeout(t);
+  }, [current, slideDuration, items.length, paused]);
 
-function BrowserAppContent() {
-  return (
-    <div style={{ fontSize: 12, color: "#1a1a1a" }}>
-      {/* Browser bar */}
-      <div style={{ background: "#f1f3f4", borderBottom: "1px solid #dadce0", padding: "6px 10px", display: "flex", alignItems: "center", gap: 8 }}>
-        <div style={{ background: "#fff", border: "1px solid #dadce0", borderRadius: 20, padding: "3px 12px", fontSize: 11, color: "#5f6368", flex: 1 }}>
-          theverge.com/ai/2025/breakthrough-models
-        </div>
-      </div>
-      <div style={{ padding: "14px 18px", background: "#fff" }}>
-        <p style={{ fontSize: 11, color: "#5f6368", marginBottom: 5 }}>THE VERGE · AI · May 29, 2025</p>
-        <h2 style={{ fontSize: 16, fontWeight: 700, lineHeight: 1.3, marginBottom: 10, fontFamily: "system-ui" }}>
-          AI Models Surpass Human Performance Across Five Core Domains in New Benchmark
-        </h2>
-        <p style={{ lineHeight: 1.65, color: "#333", background: "rgba(99,102,241,0.07)", padding: "5px 3px", borderRadius: 3 }}>
-          Next-generation AI models have achieved superhuman performance across five core domains — language understanding, logical reasoning, visual analysis, mathematical problem-solving, and code generation — according to a comprehensive report published today by the Stanford AI Lab.
-        </p>
-        <p style={{ lineHeight: 1.65, color: "#555", marginTop: 8, fontSize: 11.5 }}>
-          The findings mark the first time a single system has simultaneously exceeded expert-level benchmarks in all five areas, a milestone researchers call &ldquo;the threshold crossing.&rdquo; Industry implications are expected to be significant...
-        </p>
-      </div>
-    </div>
-  );
-}
-
-function EmailAppContent() {
-  return (
-    <div style={{ fontSize: 12, color: "#1a1a1a", background: "#fff" }}>
-      {/* Toolbar */}
-      <div style={{ background: "#0078d4", padding: "6px 12px", display: "flex", gap: 12 }}>
-        {["Reply", "Reply All", "Forward", "Delete"].map(a => (
-          <span key={a} style={{ color: "rgba(255,255,255,0.8)", fontSize: 11 }}>{a}</span>
-        ))}
-      </div>
-      {/* Email header */}
-      <div style={{ borderBottom: "1px solid #edebe9", padding: "10px 14px" }}>
-        <p style={{ fontWeight: 700, fontSize: 13, marginBottom: 6 }}>RE: Q4 Platform Migration — Delivery Confirmation</p>
-        <div style={{ display: "grid", gridTemplateColumns: "50px 1fr", gap: 2, fontSize: 11, color: "#605e5c" }}>
-          <span>From:</span><span style={{ color: "#1a1a1a" }}>sarah.chen@acmecorp.com</span>
-          <span>To:</span><span style={{ color: "#1a1a1a" }}>you@acmecorp.com</span>
-          <span>Date:</span><span>Thu, 29 May 2025 · 3:42 PM</span>
-        </div>
-      </div>
-      {/* Email body */}
-      <div style={{ padding: "12px 14px", lineHeight: 1.65, background: "rgba(99,102,241,0.04)" }}>
-        <p>Hi team,</p>
-        <p style={{ marginTop: 6 }}>I wanted to follow up on our discussion from last Thursday about the Q4 platform migration. The steering committee needs final confirmation on whether the cutover will be completed before the <strong>December 15th board presentation</strong>.</p>
-        <p style={{ marginTop: 6, color: "#605e5c", fontSize: 11 }}>Could you also confirm the rollback plan and downtime window? Please reply by EOD Friday. — Sarah</p>
-      </div>
-    </div>
-  );
-}
-
-function ImageAppContent() {
-  return (
-    <div style={{ background: "#1a1a2e", padding: 14, height: "100%" }}>
-      {/* Fake "screenshot" of whiteboard/notes */}
-      <div style={{ background: "#f0ede6", borderRadius: 8, padding: 14, fontFamily: "sans-serif", minHeight: 220, position: "relative" }}>
-        <p style={{ fontSize: 11, fontWeight: 700, color: "#333", marginBottom: 8, borderBottom: "1px solid #ccc", paddingBottom: 4 }}>Physics 101 — Forces on Inclined Plane</p>
-        {/* Diagram */}
-        <svg width="100%" viewBox="0 0 300 150" style={{ display: "block", marginBottom: 8 }}>
-          {/* Inclined plane triangle */}
-          <polygon points="30,130 250,130 250,50" fill="none" stroke="#555" strokeWidth="2"/>
-          {/* Block on slope */}
-          <rect x="130" y="76" width="26" height="20" fill="#6366f1" opacity="0.85" transform="rotate(-18,143,86)"/>
-          {/* Weight arrow */}
-          <line x1="143" y1="100" x2="143" y2="135" stroke="#e53e3e" strokeWidth="2" markerEnd="url(#a)"/>
-          <text x="148" y="128" fontSize="10" fill="#e53e3e" fontWeight="bold">mg</text>
-          {/* Normal arrow */}
-          <line x1="143" y1="86" x2="118" y2="58" stroke="#2b6cb0" strokeWidth="2"/>
-          <text x="100" y="55" fontSize="10" fill="#2b6cb0" fontWeight="bold">N</text>
-          {/* Friction arrow */}
-          <line x1="155" y1="82" x2="195" y2="68" stroke="#276749" strokeWidth="2"/>
-          <text x="194" y="63" fontSize="10" fill="#276749" fontWeight="bold">f</text>
-          {/* Angle */}
-          <path d="M220,130 A25,25,0,0,0,222,108" fill="none" stroke="#888" strokeWidth="1.5"/>
-          <text x="213" y="122" fontSize="9" fill="#666">θ=30°</text>
-          <defs><marker id="a" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto"><path d="M0,0L6,3L0,6Z" fill="#e53e3e"/></marker></defs>
-        </svg>
-        <p style={{ fontSize: 10, color: "#555", lineHeight: 1.5 }}>
-          Block mass m=5kg, θ=30°, μₖ=0.2. Find acceleration a down the slope.
-        </p>
-        <div style={{ position: "absolute", bottom: 8, right: 10, fontSize: 9, color: "#aaa" }}>Lecture 7 · Prof. Nguyen</div>
-      </div>
-    </div>
-  );
-}
-
-const CONTENT_RENDERERS = [PDFAppContent, BrowserAppContent, EmailAppContent, ImageAppContent, CodeAppContent];
-
-// ─── Streaming response renderer ───
-function StreamRenderer({ text, total }: { text: string; total: number }) {
-  return (
-    <div className="text-xs leading-[1.7]" style={{ color: "rgba(255,255,255,0.82)" }}>
-      {text.split("\n").map((line, i) => {
-        if (!line) return <br key={i} />;
-        if (line.startsWith("**") && line.endsWith("**"))
-          return <p key={i} className="font-bold mt-1.5" style={{ color: IND_BRIGHT }}>{line.replace(/\*\*/g, "")}</p>;
-        if (line.startsWith("**"))
-          return <p key={i} className="font-semibold mt-1" style={{ color: IND_BRIGHT }}>{line.replace(/\*\*/g, "")}</p>;
-        if (line.startsWith("• ") || line.startsWith("- "))
-          return <p key={i} className="mt-0.5 pl-2">{line}</p>;
-        if (line.startsWith("`") && line.endsWith("`"))
-          return <code key={i} className="block mt-1 px-2 py-1 rounded font-mono code-function" style={{ background: "rgba(99,102,241,0.12)", fontSize: 11 }}>{line.replace(/`/g, "")}</code>;
-        return <p key={i} className={i > 0 ? "mt-0.5" : ""}>{line}</p>;
-      })}
-      {text.length < total && (
-        <motion.span className="inline-block w-0.5 h-3 ml-0.5 rounded-full align-middle"
-          style={{ background: IND_BRIGHT }}
-          animate={{ opacity: [1, 0] }}
-          transition={{ duration: 0.45, repeat: Infinity }} />
-      )}
-    </div>
-  );
-}
-
-function AppDemo() {
-  const [scenarioIdx, setScenarioIdx] = useState(0);
-  const [phase, setPhase] = useState(0);
-  const [streamText, setStreamText] = useState("");
-  const [elapsed, setElapsed] = useState(0);
-  const [progress, setProgress] = useState(0);
-  const elapsedRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const streamRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const progressRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const activeRef = useRef(true);
-  const scenarioIdxRef = useRef(0);
-
-  const clearAll = useCallback(() => {
-    if (streamRef.current) clearInterval(streamRef.current);
-    if (elapsedRef.current) clearInterval(elapsedRef.current);
-    if (progressRef.current) clearInterval(progressRef.current);
+  const handleVideoMeta = useCallback((e: React.SyntheticEvent<HTMLVideoElement>) => {
+    const d = e.currentTarget.duration;
+    if (d && isFinite(d)) setSlideDuration(Math.round(d * 0.95 * 1000));
   }, []);
 
-  const runScenario = useCallback((idx: number) => {
-    clearAll();
-    setPhase(0); setStreamText(""); setElapsed(0); setProgress(0);
-    scenarioIdxRef.current = idx;
-    setScenarioIdx(idx);
-
-    const sc = SCENARIOS[idx];
-    const SCENARIO_DURATION = 13000; // ms total before advancing
-    const progressStart = Date.now();
-
-    progressRef.current = setInterval(() => {
-      const elapsed = Date.now() - progressStart;
-      setProgress(Math.min((elapsed / SCENARIO_DURATION) * 100, 100));
-    }, 50);
-
-    const t1 = setTimeout(() => setPhase(1), 800);
-    const t2 = setTimeout(() => setPhase(2), 1900);
-    const t3 = setTimeout(() => setPhase(3), 3100);
-    const t4 = setTimeout(() => {
-      setPhase(4);
-      elapsedRef.current = setInterval(() => setElapsed(p => +(p + 0.1).toFixed(1)), 100);
-      let i = 0;
-      streamRef.current = setInterval(() => {
-        i += 5;
-        setStreamText(sc.response.slice(0, i));
-        if (i >= sc.response.length) {
-          clearInterval(streamRef.current!);
-          clearInterval(elapsedRef.current!);
-        }
-      }, 22);
-    }, 3900);
-
-    // Auto-advance after scenario duration
-    const tNext = setTimeout(() => {
-      if (!activeRef.current) return;
-      const next = (scenarioIdxRef.current + 1) % SCENARIOS.length;
-      runScenario(next);
-    }, SCENARIO_DURATION);
-
-    return () => { [t1, t2, t3, t4, tNext].forEach(clearTimeout); };
-  }, [clearAll]);
-
-  useEffect(() => {
-    activeRef.current = true;
-    const cleanup = runScenario(0);
-    return () => {
-      activeRef.current = false;
-      cleanup?.();
-      clearAll();
-    };
-  }, [runScenario, clearAll]);
-
-  const sc = SCENARIOS[scenarioIdx];
-  const ContentRenderer = CONTENT_RENDERERS[scenarioIdx];
-
-  return (
-    <div className="select-none" style={{ maxWidth: 820, margin: "0 auto" }}>
-      {/* Scenario tab pills */}
-      <div className="flex flex-wrap gap-2 justify-center mb-4">
-        {SCENARIOS.map((s, i) => (
-          <motion.button
-            key={s.id}
-            onClick={() => { if (i !== scenarioIdx) runScenario(i); }}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.94 }}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all"
-            style={{
-              background: i === scenarioIdx ? IND : "rgba(255,255,255,0.06)",
-              color: i === scenarioIdx ? "white" : "rgba(255,255,255,0.45)",
-              border: i === scenarioIdx ? `1px solid ${IND}` : "1px solid rgba(255,255,255,0.08)",
-              boxShadow: i === scenarioIdx ? `0 0 16px rgba(99,102,241,0.4)` : "none",
-            }}
-          >
-            <span>{s.tabIcon}</span>
-            {s.tabLabel}
-          </motion.button>
-        ))}
-      </div>
-
-      {/* Main window */}
+  if (items.length === 0) {
+    return (
       <div
-        className="relative overflow-hidden"
+        className="w-full rounded-2xl flex items-center justify-center"
         style={{
-          borderRadius: 16,
-          boxShadow: "0 40px 100px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.07), 0 0 80px rgba(99,102,241,0.15)",
+          aspectRatio: "16 / 10",
+          background: "rgba(99,102,241,0.04)",
+          border: "1px dashed rgba(99,102,241,0.18)",
         }}
       >
-        {/* Title bar */}
-        <AnimatePresence mode="wait">
-          <motion.div key={sc.appName}
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            transition={{ duration: 0.3 }}
-            className="flex items-center gap-1.5 px-4 h-9 shrink-0"
-            style={{ background: sc.titleBarBg, borderBottom: `1px solid ${sc.isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.1)"}` }}
-          >
-            <div className="w-2.5 h-2.5 rounded-full bg-red-500/80" />
-            <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/80" />
-            <div className="w-2.5 h-2.5 rounded-full bg-green-500/80" />
-            <span className="ml-3 text-[11px]" style={{ fontFamily: "system-ui", color: sc.isDark ? "rgba(255,255,255,0.3)" : "rgba(0,0,0,0.45)" }}>
-              {sc.appName}
-            </span>
-            <div className="ml-auto flex items-center gap-1.5 text-[10px]"
-              style={{ color: sc.isDark ? "rgba(255,255,255,0.28)" : "rgba(0,0,0,0.35)" }}>
-              <motion.div className="w-1.5 h-1.5 rounded-full"
-                style={{ background: phase >= 4 ? "#22c55e" : (sc.isDark ? "rgba(255,255,255,0.18)" : "rgba(0,0,0,0.2)") }}
-                animate={phase >= 4 ? { scale: [1, 1.5, 1] } : {}}
-                transition={{ duration: 1, repeat: Infinity }}
-              />
-              {phase >= 4 ? "DoDo · responding" : "DoDo · ready"}
-            </div>
-          </motion.div>
-        </AnimatePresence>
+        <p className="text-sm" style={{ color: "rgba(255,255,255,0.18)" }}>
+          Add media in Admin → Hero Gallery
+        </p>
+      </div>
+    );
+  }
 
-        {/* App content area */}
-        <div className="relative overflow-hidden" style={{ minHeight: 270, background: sc.appBg }}>
-          <AnimatePresence mode="wait">
-            <motion.div key={sc.id}
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-              style={{ position: "absolute", inset: 0, overflow: "hidden" }}
-            >
-              <ContentRenderer />
-            </motion.div>
-          </AnimatePresence>
+  const item = items[current];
+  const isVideo = ["mp4", "webm", "mov"].includes(item.file_type);
+  const durationSec = slideDuration / 1000;
 
-          {/* DoDo overlay layer */}
-          <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
-            {/* Hotkey badge */}
-            <AnimatePresence>
-              {phase >= 1 && (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.75, y: 8 }}
-                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                  exit={{ opacity: 0, scale: 0.8, y: -6 }}
-                  transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                  style={{
-                    position: "absolute", top: 8, right: 10,
-                    display: "flex", alignItems: "center", gap: 5,
-                    padding: "5px 10px", borderRadius: 99,
-                    background: "rgba(99,102,241,0.18)",
-                    border: "1px solid rgba(99,102,241,0.38)",
-                    backdropFilter: "blur(14px)",
-                    color: IND_BRIGHT, fontSize: 11, fontWeight: 600,
-                  }}
-                >
-                  {["Ctrl", "Shift", "Space"].map((k, ki) => (
-                    <motion.kbd key={k}
-                      initial={{ scale: 0.8 }}
-                      animate={{ scale: [0.8, 1.12, 1] }}
-                      transition={{ delay: ki * 0.09, duration: 0.28 }}
-                      style={{
-                        padding: "2px 5px", borderRadius: 4, fontSize: 10,
-                        background: "rgba(99,102,241,0.28)",
-                        border: "1px solid rgba(99,102,241,0.45)",
-                      }}>
-                      {k}
-                    </motion.kbd>
-                  ))}
-                </motion.div>
-              )}
-            </AnimatePresence>
+  return (
+    <div
+      className="relative rounded-2xl overflow-hidden select-none"
+      style={{
+        aspectRatio: "16 / 10",
+        boxShadow: "0 40px 100px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.07), 0 0 80px rgba(99,102,241,0.15)",
+      }}
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+    >
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={item.id}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.6, ease: "easeInOut" }}
+          className="absolute inset-0"
+        >
+          {isVideo ? (
+            <video
+              src={item.file_url}
+              autoPlay muted playsInline
+              className="w-full h-full object-cover"
+              onLoadedMetadata={handleVideoMeta}
+            />
+          ) : (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={item.file_url} alt={item.title ?? "DoDo demo"} className="w-full h-full object-cover" />
+          )}
+        </motion.div>
+      </AnimatePresence>
 
-            {/* Selection rectangle */}
-            <AnimatePresence>
-              {phase >= 2 && (
-                <motion.div
-                  key={`sel-${sc.id}`}
-                  initial={{ clipPath: "inset(0 100% 0 0)", opacity: 0 }}
-                  animate={{ clipPath: "inset(0 0% 0 0)", opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
-                  style={{
-                    position: "absolute",
-                    top: sc.selTop, left: 4, right: 8, height: sc.selHeight,
-                    border: "2px dashed rgba(99,102,241,0.8)",
-                    borderRadius: 5,
-                    background: "rgba(99,102,241,0.09)",
-                  }}
-                />
-              )}
-            </AnimatePresence>
-
-            {/* Command popup */}
-            <AnimatePresence>
-              {phase >= 3 && (
-                <motion.div
-                  key={`cmd-${sc.id}`}
-                  initial={{ opacity: 0, y: 12, scale: 0.9 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.92 }}
-                  transition={{ type: "spring", stiffness: 520, damping: 30 }}
-                  style={{
-                    position: "absolute",
-                    top: sc.popupTop, left: sc.popupLeft,
-                    zIndex: 20, pointerEvents: "auto",
-                    background: "rgba(8,8,20,0.97)",
-                    backdropFilter: "blur(32px)",
-                    border: "1px solid rgba(99,102,241,0.3)",
-                    borderRadius: 12, padding: 6, minWidth: 176,
-                    boxShadow: "0 20px 60px rgba(0,0,0,0.75), 0 0 28px rgba(99,102,241,0.2)",
-                  }}
-                >
-                  {sc.commands.map((cmd, ci) => (
-                    <motion.div key={cmd.label}
-                      initial={{ opacity: 0, x: -8 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: 0.03 + ci * 0.055 }}
-                      className="flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-xs"
-                      style={{
-                        background: cmd.highlight ? "rgba(99,102,241,0.22)" : "transparent",
-                        color: cmd.highlight ? IND_BRIGHT : "rgba(255,255,255,0.58)",
-                        fontWeight: cmd.highlight ? 600 : 400,
-                        cursor: "default",
-                      }}
-                    >
-                      <span style={{ fontSize: 13 }}>{cmd.icon}</span>
-                      {cmd.label}
-                      <kbd className="ml-auto text-[9px] px-1 py-0.5 rounded opacity-40"
-                        style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}>
-                        {cmd.shortcut}
-                      </kbd>
-                    </motion.div>
-                  ))}
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-
-          {/* AI Response panel */}
-          <AnimatePresence>
-            {phase >= 4 && (
-              <motion.div
-                initial={{ x: "100%", opacity: 0 }}
-                animate={{ x: 0, opacity: 1 }}
-                exit={{ x: "100%", opacity: 0 }}
-                transition={{ type: "spring", stiffness: 270, damping: 30 }}
-                style={{
-                  position: "absolute", top: 0, right: 0, bottom: 0, width: 252,
-                  background: "rgba(6,6,18,0.98)", backdropFilter: "blur(40px)",
-                  borderLeft: "1px solid rgba(99,102,241,0.2)",
-                  zIndex: 30, display: "flex", flexDirection: "column",
-                }}
-              >
-                {/* Panel header */}
-                <div className="flex items-center gap-2 px-3 py-2 shrink-0" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-                  <Image src="/icon.png" alt="DoDo" width={15} height={15} className="rounded" />
-                  <span className="text-[11px] font-semibold" style={{ color: IND_BRIGHT }}>DoDo · {sc.profile}</span>
-                  <div className="ml-auto flex items-center gap-1 text-[10px]" style={{ color: "rgba(255,255,255,0.28)" }}>
-                    <motion.div className="w-1.5 h-1.5 rounded-full bg-emerald-400"
-                      animate={{ opacity: [1, 0.4, 1] }} transition={{ duration: 1.2, repeat: Infinity }} />
-                    {elapsed.toFixed(1)}s
-                  </div>
-                </div>
-                {/* Streaming text */}
-                <div className="flex-1 overflow-auto px-3 py-2.5">
-                  <StreamRenderer text={streamText} total={sc.response.length} />
-                </div>
-                {/* Copy button */}
-                {streamText.length >= sc.response.length && (
-                  <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
-                    className="px-3 pb-2.5 shrink-0">
-                    <button className="w-full py-1.5 rounded-lg text-xs font-semibold text-white active:scale-95"
-                      style={{ background: IND }}>
-                      {sc.copyLabel}
-                    </button>
-                  </motion.div>
-                )}
-              </motion.div>
-            )}
-          </AnimatePresence>
+      {/* Title overlay */}
+      {item.title && (
+        <div
+          className="absolute bottom-0 inset-x-0 px-5 pb-4 pt-8 pointer-events-none"
+          style={{ background: "linear-gradient(to top, rgba(0,0,0,0.6), transparent)" }}
+        >
+          <p className="text-xs font-medium" style={{ color: "rgba(255,255,255,0.65)" }}>{item.title}</p>
         </div>
+      )}
 
-        {/* Progress bar */}
-        <div style={{ height: 2, background: "rgba(255,255,255,0.05)" }}>
+      {/* Dot nav */}
+      {items.length > 1 && (
+        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
+          {items.map((_, i) => (
+            <button
+              key={i}
+              onClick={() => { setCurrent(i); setPaused(true); setSlideDuration(6000); }}
+              className="rounded-full transition-all duration-300"
+              style={{
+                width: i === current ? 20 : 6,
+                height: 6,
+                background: i === current ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.3)",
+              }}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Progress bar — width animation driven by slideDuration */}
+      {!paused && items.length > 1 && (
+        <div className="absolute bottom-0 inset-x-0 h-0.5" style={{ background: "rgba(255,255,255,0.05)" }}>
           <motion.div
-            style={{ height: "100%", background: `linear-gradient(90deg, ${IND}, #8b5cf6)`, width: `${progress}%` }}
-            transition={{ duration: 0.1 }}
+            key={`${current}-${slideDuration}`}
+            initial={{ width: "0%" }}
+            animate={{ width: "100%" }}
+            transition={{ duration: durationSec, ease: "linear" }}
+            style={{ height: "100%", background: `linear-gradient(90deg, ${IND}, #8b5cf6)` }}
           />
         </div>
-      </div>
-
-      {/* Scenario description */}
-      <AnimatePresence mode="wait">
-        <motion.p key={sc.id}
-          initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}
-          transition={{ duration: 0.35 }}
-          className="text-center text-xs mt-3"
-          style={{ color: "rgba(255,255,255,0.3)" }}
-        >
-          Use case: <strong style={{ color: "rgba(255,255,255,0.5)" }}>{sc.audience}</strong> · {sc.tabIcon} {sc.tabLabel}
-        </motion.p>
-      </AnimatePresence>
+      )}
     </div>
   );
 }
@@ -1278,8 +835,8 @@ function PricingCard({ plan, price, period, features, cta, highlighted, badge, d
 // ─── Main ───
 export default function LandingPage() {
   const { scrollY } = useScroll();
-  const demoY = useTransform(scrollY, [0, 700], [0, 60]);
   const heroOpacity = useTransform(scrollY, [0, 500], [1, 0.4]);
+  const [galleryItems, setGalleryItems] = useState<GalleryItem[]>([]);
 
   // Dynamic download URL + version from /api/version
   const [downloadUrl, setDownloadUrl] = useState<string>("#");
@@ -1298,6 +855,11 @@ export default function LandingPage() {
     fetch("/api/beta-config")
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d) setBetaConfig(d); })
+      .catch(() => {});
+
+    fetch("/api/hero-gallery")
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (Array.isArray(d)) setGalleryItems(d); })
       .catch(() => {});
   }, []);
 
@@ -1403,10 +965,9 @@ export default function LandingPage() {
           initial={{ opacity: 0, y: 50, scale: 0.94 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={{ delay: 0.55, duration: 1.1, ease: [0.22, 1, 0.36, 1] }}
-          style={{ y: demoY }}
           className="relative z-10 w-full max-w-[800px] mx-auto mt-14 px-4"
         >
-          <AppDemo />
+          <HeroGallery items={galleryItems} />
           {/* Bottom fade */}
           <div className="absolute bottom-0 inset-x-0 h-20 pointer-events-none"
             style={{ background: `linear-gradient(to top, ${BG}, transparent)` }} />

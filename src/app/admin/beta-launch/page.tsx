@@ -378,7 +378,7 @@ export default function BetaLaunchPage() {
             className={`${inputCls} [color-scheme:dark]`}
           />
           <p className="text-xs text-slate-600 mt-1.5">
-            Leave blank to hide countdown and show "Beta is live" instead.
+            Leave blank to hide countdown and show &ldquo;Beta is live&rdquo; instead.
           </p>
         </div>
 
@@ -421,7 +421,7 @@ export default function BetaLaunchPage() {
               onChange={e => setForm(f => ({ ...f, beta_slots: parseInt(e.target.value) || 10000 }))}
               className={inputCls}
             />
-            <p className="text-xs text-slate-600 mt-1">Shown as "X spots remaining" on homepage.</p>
+            <p className="text-xs text-slate-600 mt-1">Shown as &ldquo;X spots remaining&rdquo; on homepage.</p>
           </div>
         </div>
 

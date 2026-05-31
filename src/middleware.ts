@@ -40,6 +40,6 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  // Match all /admin/* routes EXCEPT /admin/releases (file upload — body too large for middleware)
-  matcher: ["/admin/((?!releases(?:/|$)).*)"],
+  // Exclude file-upload routes — middleware buffers entire body which breaks large uploads
+  matcher: ["/admin/((?!releases(?:/|$)|hero-gallery(?:/|$)).*)"],
 };

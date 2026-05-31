@@ -7,7 +7,6 @@ const nextConfig: NextConfig = {
       bodySizeLimit: "500mb",
     },
   },
-  middlewareClientMaxBodySize: "500mb",
   async headers() {
     return [
       {
