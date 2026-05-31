@@ -1,8 +1,29 @@
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 
-// Revalidate every 60s so Vercel edge cache stays fresh without hitting Supabase on every request
 export const revalidate = 60;
+
+const DRIVE_PATTERNS = [
+  /drive\.usercontent\.google\.com\/download[^?]*\?.*[?&]id=([a-zA-Z0-9_-]{10,})/,
+  /drive\.google\.com\/uc[^?]*\?.*[?&]id=([a-zA-Z0-9_-]{10,})/,
+  /drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]{10,})/,
+];
+
+function resolveDownloadUrl(raw: string): string {
+  for (const re of DRIVE_PATTERNS) {
+    const m = raw.match(re);
+    if (m) {
+      const base = process.env.NEXT_PUBLIC_APP_URL ?? "";
+      return `${base}/api/download/drive/${m[1]}`;
+    }
+  }
+  // Already a proxy path — make absolute
+  if (raw.startsWith("/api/download/drive/")) {
+    const base = process.env.NEXT_PUBLIC_APP_URL ?? "";
+    return `${base}${raw}`;
+  }
+  return raw;
+}
 
 export async function GET() {
   const supabase = createServiceClient();
@@ -24,7 +45,7 @@ export async function GET() {
     {
       minVersion:    data.min_version,
       latestVersion: data.latest_version,
-      downloadUrl:   data.download_url,
+      downloadUrl:   resolveDownloadUrl(data.download_url ?? ""),
       releaseNotes:  data.release_notes  ?? "",
       buildHash:     data.build_hash     ?? null,
       customMessage: data.custom_message ?? null,

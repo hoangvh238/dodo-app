@@ -13,6 +13,49 @@ function guessFileName(url: string): string {
   catch { return url; }
 }
 
+function extractDriveFileId(input: string): string | null {
+  // Handles: /file/d/ID/view, /open?id=ID, id=ID param, or raw ID
+  const patterns = [
+    /\/file\/d\/([a-zA-Z0-9_-]{10,})/,
+    /[?&]id=([a-zA-Z0-9_-]{10,})/,
+    /\/d\/([a-zA-Z0-9_-]{10,})/,
+  ];
+  for (const re of patterns) {
+    const m = input.match(re);
+    if (m) return m[1];
+  }
+  // Raw file ID (no slashes, no dots)
+  if (/^[a-zA-Z0-9_-]{25,}$/.test(input.trim())) return input.trim();
+  return null;
+}
+
+export async function resolveGoogleDriveAction(driveInput: string): Promise<{
+  fileId: string; fileName: string; fileSize: number; downloadUrl: string;
+}> {
+  const fileId = extractDriveFileId(driveInput);
+  if (!fileId) throw new Error("Cannot extract file ID from Google Drive URL.");
+
+  const apiKey = process.env.GOOGLE_DRIVE_API_KEY;
+  if (!apiKey) throw new Error("GOOGLE_DRIVE_API_KEY not configured.");
+
+  const metaRes = await fetch(
+    `https://www.googleapis.com/drive/v3/files/${fileId}?fields=name%2Csize&key=${apiKey}`,
+    { next: { revalidate: 0 } }
+  );
+  if (!metaRes.ok) {
+    const err = await metaRes.json().catch(() => ({}));
+    throw new Error(err?.error?.message ?? `Drive API error ${metaRes.status} — make sure file is publicly shared.`);
+  }
+  const meta = await metaRes.json();
+
+  return {
+    fileId,
+    fileName: meta.name ?? fileId,
+    fileSize: meta.size ? parseInt(meta.size, 10) : 0,
+    downloadUrl: `/api/download/drive/${fileId}`,
+  };
+}
+
 export async function publishReleaseAction(formData: FormData) {
   const version = (formData.get("version") as string).trim();
   const platform = formData.get("platform") as string;
@@ -40,6 +83,13 @@ export async function publishReleaseAction(formData: FormData) {
     fileUrl = `/releases/${platform}/${version}/${sanitized}`;
     fileName = file.name;
     fileSize = file.size;
+  } else if (mode === "drive") {
+    const driveInput = (formData.get("driveUrl") as string | null ?? "").trim();
+    if (!driveInput) throw new Error("Google Drive URL is required.");
+    const resolved = await resolveGoogleDriveAction(driveInput);
+    fileUrl = resolved.downloadUrl;
+    fileName = resolved.fileName;
+    fileSize = resolved.fileSize;
   } else {
     fileUrl = (formData.get("linkUrl") as string | null ?? "").trim();
     if (!fileUrl) throw new Error("Download URL is required.");

@@ -1,20 +1,21 @@
 "use client";
 
-import { useState, useRef, useEffect, useTransition } from "react";
+import React, { useState, useRef, useEffect, useTransition } from "react";
 import {
   Upload, Tag, Package, X, CheckCircle2, AlertCircle,
-  Download, Trash2, Clock, Link2, HardDrive, Zap,
+  Download, Trash2, Clock, Link2, HardDrive, Zap, Cloud,
 } from "lucide-react";
 import {
   publishReleaseAction,
   deleteReleaseAction,
   fetchReleasesAction,
   promoteReleaseAction,
+  resolveGoogleDriveAction,
 } from "./actions";
 
 type Platform = "ios" | "android" | "windows" | "macos" | "web";
 type ReleaseChannel = "stable" | "beta" | "alpha";
-type UploadMode = "url" | "file";
+type UploadMode = "url" | "file" | "drive";
 
 interface Release {
   id: string;
@@ -60,11 +61,29 @@ function guessFileName(url: string): string {
   catch { return url; }
 }
 
+function toProxyUrl(url: string): string {
+  // Rewrite any Google Drive URL to go through our bypass proxy
+  const drivePatterns = [
+    /drive\.usercontent\.google\.com\/download[^?]*\?.*[?&]id=([a-zA-Z0-9_-]{10,})/,
+    /drive\.google\.com\/uc[^?]*\?.*[?&]id=([a-zA-Z0-9_-]{10,})/,
+    /drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]{10,})/,
+  ];
+  for (const re of drivePatterns) {
+    const m = url.match(re);
+    if (m) return `/api/download/drive/${m[1]}`;
+  }
+  return url;
+}
+
 export default function ReleasesPage() {
   const [mode, setMode] = useState<UploadMode>("url");
   const [dragging, setDragging] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [linkUrl, setLinkUrl] = useState("");
+  const [driveUrl, setDriveUrl] = useState("");
+  const [driveResolved, setDriveResolved] = useState<{ fileName: string; fileSize: number } | null>(null);
+  const [driveResolving, setDriveResolving] = useState(false);
+  const [driveError, setDriveError] = useState("");
   const [version, setVersion] = useState("");
   const [platform, setPlatform] = useState<Platform>("windows");
   const [channel, setChannel] = useState<ReleaseChannel>("stable");
@@ -88,7 +107,28 @@ export default function ReleasesPage() {
 
   useEffect(() => { loadReleases(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const canSubmit = version.trim() && (mode === "url" ? linkUrl.trim() : !!file);
+  const canSubmit = version.trim() && (
+    mode === "url" ? !!linkUrl.trim() :
+    mode === "drive" ? !!driveResolved :
+    !!file
+  );
+
+  const handleResolveDrive = () => {
+    if (!driveUrl.trim()) return;
+    setDriveResolving(true);
+    setDriveResolved(null);
+    setDriveError("");
+    startTransition(async () => {
+      try {
+        const result = await resolveGoogleDriveAction(driveUrl.trim());
+        setDriveResolved({ fileName: result.fileName, fileSize: result.fileSize });
+      } catch (err: unknown) {
+        setDriveError(err instanceof Error ? err.message : "Failed to resolve Drive file.");
+      } finally {
+        setDriveResolving(false);
+      }
+    });
+  };
 
   const handlePublish = () => {
     if (!canSubmit) return;
@@ -100,6 +140,7 @@ export default function ReleasesPage() {
     fd.append("mode", mode);
     if (mode === "file" && file) fd.append("file", file);
     if (mode === "url") fd.append("linkUrl", linkUrl.trim());
+    if (mode === "drive") fd.append("driveUrl", driveUrl.trim());
 
     setStatus("idle"); setErrorMsg("");
     startTransition(async () => {
@@ -107,6 +148,7 @@ export default function ReleasesPage() {
         await publishReleaseAction(fd);
         setStatus("success");
         setFile(null); setVersion(""); setNotes(""); setLinkUrl("");
+        setDriveUrl(""); setDriveResolved(null); setDriveError("");
         loadReleases();
       } catch (err: unknown) {
         setStatus("error");
@@ -167,13 +209,16 @@ export default function ReleasesPage() {
         {/* Mode toggle */}
         <div className="flex gap-1 p-1 rounded-lg w-fit"
           style={{ background: "rgba(15,23,42,0.6)", border: "1px solid rgba(51,65,85,0.8)" }}>
-          {(["url", "file"] as UploadMode[]).map(m => (
-            <button key={m} onClick={() => setMode(m)}
+          {([
+            { id: "url", label: "Link URL", icon: <Link2 size={12} /> },
+            { id: "drive", label: "Google Drive", icon: <Cloud size={12} /> },
+            { id: "file", label: "Upload File", icon: <Upload size={12} /> },
+          ] as { id: UploadMode; label: string; icon: React.ReactNode }[]).map(m => (
+            <button key={m.id} onClick={() => setMode(m.id)}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
-                mode === m ? "bg-brand text-white" : "text-slate-400 hover:text-slate-200"
+                mode === m.id ? "bg-brand text-white" : "text-slate-400 hover:text-slate-200"
               }`}>
-              {m === "url" ? <Link2 size={12} /> : <Upload size={12} />}
-              {m === "url" ? "Link URL" : "Upload File"}
+              {m.icon}{m.label}
             </button>
           ))}
         </div>
@@ -187,6 +232,39 @@ export default function ReleasesPage() {
               placeholder="https://github.com/hoangvh238/dodo-releases/releases/download/v1.0.0/DoDo-Setup.exe"
               className="w-full bg-bg-base border border-slate-700 rounded-lg px-3 py-2 text-slate-100 text-sm focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand/30 placeholder:text-slate-600" />
             <p className="text-xs text-slate-500 mt-1.5">GitHub Releases, Cloudflare R2, S3, or any public URL.</p>
+          </div>
+        ) : mode === "drive" ? (
+          <div className="space-y-3">
+            <label className="block text-xs font-medium text-slate-400 mb-1.5">
+              <Cloud size={11} className="inline mr-1" />Google Drive URL or File ID
+            </label>
+            <div className="flex gap-2">
+              <input type="text" value={driveUrl}
+                onChange={e => { setDriveUrl(e.target.value); setDriveResolved(null); setDriveError(""); }}
+                onKeyDown={e => e.key === "Enter" && handleResolveDrive()}
+                placeholder="https://drive.google.com/file/d/1G8NO7AN99k.../view  hoặc  paste File ID"
+                className="flex-1 bg-bg-base border border-slate-700 rounded-lg px-3 py-2 text-slate-100 text-sm focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand/30 placeholder:text-slate-600" />
+              <button onClick={handleResolveDrive} disabled={!driveUrl.trim() || driveResolving}
+                className="px-3 py-2 bg-slate-700 hover:bg-slate-600 disabled:opacity-40 text-slate-200 text-xs font-medium rounded-lg transition-colors whitespace-nowrap">
+                {driveResolving ? "Resolving…" : "Verify"}
+              </button>
+            </div>
+            {driveResolved && (
+              <div className="flex items-center gap-3 bg-emerald-950/30 border border-emerald-500/20 rounded-lg px-3 py-2.5">
+                <CheckCircle2 size={14} className="text-emerald-400 shrink-0" />
+                <div>
+                  <p className="text-emerald-300 text-xs font-medium">{driveResolved.fileName}</p>
+                  <p className="text-emerald-500/70 text-xs">{formatBytes(driveResolved.fileSize)} · publicly accessible</p>
+                </div>
+              </div>
+            )}
+            {driveError && (
+              <div className="flex items-start gap-2 bg-red-950/30 border border-red-500/20 rounded-lg px-3 py-2.5">
+                <AlertCircle size={14} className="text-red-400 shrink-0 mt-0.5" />
+                <p className="text-red-400 text-xs">{driveError}</p>
+              </div>
+            )}
+            <p className="text-xs text-slate-500">File must be set to <strong className="text-slate-400">Anyone with the link</strong> in Drive sharing settings.</p>
           </div>
         ) : (
           <div
@@ -279,7 +357,7 @@ export default function ReleasesPage() {
         {isPending && (
           <div className="flex items-center gap-2 text-slate-400 text-sm">
             <div className="w-4 h-4 border-2 border-brand border-t-transparent rounded-full animate-spin" />
-            {mode === "file" ? "Uploading via server…" : "Saving record…"}
+            {mode === "file" ? "Uploading via server…" : mode === "drive" ? "Resolving Drive file…" : "Saving record…"}
           </div>
         )}
         {status === "success" && !isPending && (
@@ -358,7 +436,7 @@ export default function ReleasesPage() {
                   </td>
                   <td className="px-5 py-3.5">
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <a href={r.file_url} target="_blank" rel="noreferrer"
+                      <a href={toProxyUrl(r.file_url)} rel="noreferrer"
                         className="p-1.5 rounded-lg text-slate-400 hover:text-brand hover:bg-brand/10 transition-colors">
                         <Download size={13} />
                       </a>
