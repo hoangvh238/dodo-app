@@ -229,7 +229,7 @@ export default function ReleasesPage() {
               <Link2 size={11} className="inline mr-1" />Direct download URL
             </label>
             <input type="url" value={linkUrl} onChange={e => setLinkUrl(e.target.value)}
-              placeholder="https://github.com/hoangvh238/dodo-releases/releases/download/v1.0.0/DoDo-Setup.exe"
+              placeholder="https://github.com/hoangvh238/dodo-releases/releases/download/v1.0.0/SnapAha-Setup.exe"
               className="w-full bg-bg-base border border-slate-700 rounded-lg px-3 py-2 text-slate-100 text-sm focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand/30 placeholder:text-slate-600" />
             <p className="text-xs text-slate-500 mt-1.5">GitHub Releases, Cloudflare R2, S3, or any public URL.</p>
           </div>

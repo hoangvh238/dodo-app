@@ -41,6 +41,9 @@ export async function uploadGalleryItemAction(formData: FormData) {
       .upload(safeName, Buffer.from(bytes), {
         contentType: file.type || "application/octet-stream",
         upsert: false,
+        // Filenames are timestamp-unique, so the asset is immutable — let the
+        // browser/CDN cache it for a year instead of re-fetching from Supabase.
+        cacheControl: "31536000",
       });
 
     if (error) throw new Error(error.message);

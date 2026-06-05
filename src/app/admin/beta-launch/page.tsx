@@ -406,7 +406,6 @@ export default function BetaLaunchPage() {
           <textarea
             value={form.announcement}
             onChange={e => setForm(f => ({ ...f, announcement: e.target.value }))}
-            placeholder="Early access is live. Download free and help shape DoDo v1.0."
             rows={3}
             className={`${inputCls} resize-none`}
           />

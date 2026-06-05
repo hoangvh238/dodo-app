@@ -34,9 +34,9 @@ export default function LoginPage() {
       <div className="relative w-full max-w-sm px-4">
         <div className="text-center mb-8">
           <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-indigo-500/30">
-            <span className="text-white font-bold text-2xl">D</span>
+            <span className="text-white font-bold text-2xl">S</span>
           </div>
-          <h1 className="text-2xl font-bold text-white">DoDo Analytics</h1>
+          <h1 className="text-2xl font-bold text-white">SnapAha Analytics</h1>
           <p className="text-slate-500 text-sm mt-1">Internal dashboard · authorized access only</p>
         </div>
 

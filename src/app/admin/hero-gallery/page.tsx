@@ -208,7 +208,7 @@ export default function HeroGalleryPage() {
           <div>
             <label className="block text-xs font-medium text-slate-400 mb-1.5">Title (optional)</label>
             <input type="text" value={title} onChange={e => setTitle(e.target.value)}
-              placeholder="DoDo — instant AI answer"
+              placeholder="SnapAha — instant AI answer"
               className="w-full bg-bg-base border border-slate-700 rounded-lg px-3 py-2 text-slate-100 text-sm focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand/30 placeholder:text-slate-600" />
           </div>
           <div>

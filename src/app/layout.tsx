@@ -10,8 +10,8 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "DoDo — AI that lives on your screen",
-  description: "Press one shortcut. Select any area. Get instant AI help without leaving what you're doing.",
+  title: "SnapAha — Snap your screen, get the aha",
+  description: "Press one shortcut. Snap any area of your screen. Get instant AI help without leaving what you're doing.",
   icons: {
     icon: "/icon.ico",
     shortcut: "/icon.ico",

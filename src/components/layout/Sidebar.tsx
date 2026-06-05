@@ -68,10 +68,10 @@ export default function Sidebar() {
       <div className="px-4 py-5 border-b border-white/[0.06]">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-lg shadow-indigo-500/30">
-            <span className="text-white text-sm font-bold">D</span>
+            <span className="text-white text-sm font-bold">S</span>
           </div>
           <div>
-            <p className="font-semibold text-slate-100 text-sm leading-tight">DoDo</p>
+            <p className="font-semibold text-slate-100 text-sm leading-tight">SnapAha</p>
             <p className="text-[10px] text-slate-500 tracking-wide uppercase">Analytics</p>
           </div>
         </div>

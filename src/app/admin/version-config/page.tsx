@@ -82,7 +82,7 @@ function GatePreview({ config }: { config: Partial<VersionConfig> }) {
               {config.custom_message || "Access Restricted"}
             </p>
             <p className="text-slate-400 text-xs mb-5">
-              {config.custom_message ? `v1.0.0` : "This version of DoDo is no longer available.\nPlease download the latest version to continue."}
+              {config.custom_message ? `v1.0.0` : "This version of SnapAha is no longer available.\nPlease download the latest version to continue."}
             </p>
             <div className="h-px bg-slate-700 mb-4" />
             <div className="w-full py-3 rounded-xl text-white text-sm font-semibold bg-gradient-to-r from-[#5E5CE6] to-[#0A84FF] flex items-center justify-center gap-2 cursor-default">
@@ -383,7 +383,7 @@ export default function VersionConfigPage() {
       <div>
         <h1 className="text-2xl font-bold text-slate-100">Version Config</h1>
         <p className="text-slate-400 text-sm mt-0.5">
-          Controls update gates and hard-block for all DoDo clients · cached 60s on Vercel edge
+          Controls update gates and hard-block for all SnapAha clients · cached 60s on Vercel edge
         </p>
       </div>
 
