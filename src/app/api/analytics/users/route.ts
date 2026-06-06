@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
     supabase.rpc("count_ip_users", { p_search: search }),
   ]);
 
-  const total = typeof countRaw === "number" ? countRaw : 0;
+  const total = Number(countRaw ?? 0);
 
   return NextResponse.json({ data: data ?? [], total, page, limit });
 }

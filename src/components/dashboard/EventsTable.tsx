@@ -97,10 +97,12 @@ export default function EventsTable({ events, total, page, eventTypes, currentTy
                 </td>
                 <td className="px-5 py-3 text-xs text-slate-500">{e.app_version ?? "—"}</td>
                 <td className="px-5 py-3 text-xs text-slate-500">{e.os_platform ?? "—"}</td>
-                <td className="px-5 py-3 text-[10px] text-slate-600 font-mono max-w-xs truncate">
-                  {Object.keys(e.event_data ?? {}).length > 0
-                    ? JSON.stringify(e.event_data)
-                    : "—"}
+                <td className="px-5 py-3 text-[10px] text-slate-600 font-mono max-w-xs">
+                  {Object.keys(e.event_data ?? {}).length > 0 ? (
+                    <span className="break-all line-clamp-3 leading-relaxed">
+                      {JSON.stringify(e.event_data)}
+                    </span>
+                  ) : "—"}
                 </td>
               </tr>
             ))}

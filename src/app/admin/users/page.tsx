@@ -17,7 +17,7 @@ async function getUsers(page: number, search?: string): Promise<{ data: IpUser[]
     supabase.rpc("count_ip_users", { p_search: search ?? null }),
   ]);
 
-  const total = typeof countRaw === "number" ? countRaw : 0;
+  const total = Number(countRaw ?? 0);
   return { data: (data ?? []) as IpUser[], total };
 }
 

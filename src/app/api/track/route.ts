@@ -66,7 +66,27 @@ export async function POST(request: NextRequest) {
   const supabase = createServiceClient();
   const now = new Date().toISOString();
 
-  // Bulk insert all events in one query
+  // Upsert session FIRST so the increment_session_events trigger finds the row
+  const last = valid[valid.length - 1];
+  const { error: sessErr } = await supabase.from("sessions").upsert(
+    {
+      id:           last.sessionId,
+      app_version:  last.appVersion ?? null,
+      os_platform:  last.osPlatform ?? null,
+      last_seen_at: now,
+      ...geoFields,
+    },
+    { onConflict: "id" }
+  );
+  if (sessErr) {
+    console.error("[track] session upsert error:", sessErr.message);
+    return NextResponse.json(
+      { error: "Session write failed" },
+      { status: 500, headers: { "Access-Control-Allow-Origin": "*" } }
+    );
+  }
+
+  // Bulk insert events — trigger will increment sessions.events_count per row
   const eventRows = valid.map((e) => ({
     session_id:  e.sessionId,
     event_type:  e.eventType,
@@ -77,21 +97,13 @@ export async function POST(request: NextRequest) {
   }));
 
   const { error: evErr } = await supabase.from("events").insert(eventRows);
-  if (evErr) console.error("[track] events insert error:", evErr.message);
-
-  // Upsert the session using the last event's metadata (most up-to-date)
-  const last = valid[valid.length - 1];
-  const { error: sessErr } = await supabase.from("sessions").upsert(
-    {
-      id:          last.sessionId,
-      app_version: last.appVersion ?? null,
-      os_platform: last.osPlatform ?? null,
-      last_seen_at: now,
-      ...geoFields,
-    },
-    { onConflict: "id" }
-  );
-  if (sessErr) console.error("[track] session upsert error:", sessErr.message);
+  if (evErr) {
+    console.error("[track] events insert error:", evErr.message);
+    return NextResponse.json(
+      { error: "Events write failed" },
+      { status: 500, headers: { "Access-Control-Allow-Origin": "*" } }
+    );
+  }
 
   return NextResponse.json(
     { ok: true, inserted: eventRows.length },

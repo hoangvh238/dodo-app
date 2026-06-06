@@ -2,10 +2,10 @@ export const dynamic = "force-dynamic";
 import { createServiceClient } from "@/lib/supabase/service";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, UserCircle2, Globe, Calendar, Activity, Layers, Monitor } from "lucide-react";
+import { ArrowLeft, UserCircle2, Globe, Calendar, Activity, Layers, Monitor, Cpu, DollarSign, Zap } from "lucide-react";
 import { flagEmoji, formatDate, formatRelative } from "@/lib/utils";
 import UserActivityChart from "@/components/dashboard/UserActivityChart";
-import type { IpUserProfile, UserSession } from "@/types/analytics";
+import type { IpUserProfile, UserSession, AiModelUsage } from "@/types/analytics";
 
 async function getUserData(ip: string) {
   const supabase = createServiceClient();
@@ -15,6 +15,7 @@ async function getUserData(ip: string) {
     { data: eventTypes },
     { data: activityRaw },
     { data: recentEvents },
+    { data: aiUsageRaw },
   ] = await Promise.all([
     supabase.rpc("get_ip_user_profile", { p_ip: ip }),
     supabase.rpc("get_sessions_for_ip", { p_ip: ip, p_limit: 15, p_offset: 0 }),
@@ -26,10 +27,11 @@ async function getUserData(ip: string) {
       .eq("ip_address", ip)
       .order("created_at", { ascending: false })
       .limit(30),
+    supabase.rpc("get_ai_usage_for_ip", { p_ip: ip }),
   ]);
 
   const profile = Array.isArray(profileRaw) ? profileRaw[0] : profileRaw;
-  return { profile, sessions, eventTypes, activityRaw, recentEvents };
+  return { profile, sessions, eventTypes, activityRaw, recentEvents, aiUsageRaw };
 }
 
 function maskIp(ip: string) {
@@ -53,7 +55,7 @@ export default async function UserDetailPage({
   const { ip: encodedIp } = await params;
   const ip = decodeURIComponent(encodedIp);
 
-  const { profile, sessions, eventTypes, activityRaw, recentEvents } = await getUserData(ip);
+  const { profile, sessions, eventTypes, activityRaw, recentEvents, aiUsageRaw } = await getUserData(ip);
 
   if (!profile) notFound();
 
@@ -67,6 +69,16 @@ export default async function UserDetailPage({
     })
   );
   const etTotal = etList.reduce((s: number, e: { count: number }) => s + e.count, 0);
+
+  const aiUsage = (aiUsageRaw ?? []) as AiModelUsage[];
+  const aiTotals = aiUsage.reduce(
+    (acc, row) => ({
+      queries:       acc.queries + Number(row.query_count),
+      total_tokens:  acc.total_tokens + Number(row.total_tokens),
+      cost_usd:      acc.cost_usd + Number(row.estimated_cost_usd),
+    }),
+    { queries: 0, total_tokens: 0, cost_usd: 0 }
+  );
 
   return (
     <div className="space-y-6 max-w-6xl">
@@ -139,6 +151,59 @@ export default async function UserDetailPage({
           </div>
         </div>
       </div>
+
+      {/* AI Usage & Cost */}
+      {aiUsage.length > 0 && (
+        <div className="rounded-2xl border border-white/[0.06] bg-[#0d0d1a] p-5">
+          <h3 className="text-sm font-semibold text-slate-100 mb-4 flex items-center gap-2">
+            <Cpu size={14} className="text-violet-400" /> AI Usage & Cost
+          </h3>
+          <div className="grid grid-cols-3 gap-4 mb-5">
+            <div className="rounded-xl bg-white/[0.03] border border-white/[0.05] px-4 py-3">
+              <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1">
+                <Zap size={9} /> Total Queries
+              </p>
+              <p className="text-xl font-bold text-slate-100 tabular-nums">{aiTotals.queries.toLocaleString()}</p>
+            </div>
+            <div className="rounded-xl bg-white/[0.03] border border-white/[0.05] px-4 py-3">
+              <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1">Total Tokens</p>
+              <p className="text-xl font-bold text-slate-100 tabular-nums">
+                {aiTotals.total_tokens >= 1_000_000
+                  ? `${(aiTotals.total_tokens / 1_000_000).toFixed(2)}M`
+                  : aiTotals.total_tokens >= 1_000
+                  ? `${(aiTotals.total_tokens / 1_000).toFixed(1)}K`
+                  : aiTotals.total_tokens.toLocaleString()}
+              </p>
+            </div>
+            <div className="rounded-xl bg-white/[0.03] border border-white/[0.05] px-4 py-3">
+              <p className="text-[10px] text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1">
+                <DollarSign size={9} /> Est. Cost
+              </p>
+              <p className="text-xl font-bold text-amber-400 tabular-nums">
+                ${aiTotals.cost_usd < 0.01 ? aiTotals.cost_usd.toFixed(5) : aiTotals.cost_usd.toFixed(4)}
+              </p>
+            </div>
+          </div>
+
+          {/* Per-model breakdown */}
+          <div className="space-y-2">
+            {aiUsage.map((row) => (
+              <div key={row.model} className="flex items-center gap-3 text-xs">
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-violet-500/10 border border-violet-500/20 text-violet-300 text-[10px] font-mono shrink-0">
+                  {row.model}
+                </span>
+                <span className="text-slate-500">{Number(row.query_count).toLocaleString()} queries</span>
+                <span className="text-slate-600">·</span>
+                <span className="text-slate-500">
+                  {(Number(row.input_tokens) / 1000).toFixed(1)}K in / {(Number(row.output_tokens) / 1000).toFixed(1)}K out
+                </span>
+                <span className="text-slate-600">·</span>
+                <span className="text-amber-400/80 font-mono">${Number(row.estimated_cost_usd).toFixed(5)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Activity chart + event breakdown */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
@@ -226,12 +291,12 @@ export default async function UserDetailPage({
               created_at: string; app_version: string | null; os_platform: string | null;
             }) => (
               <div key={e.id} className="px-5 py-3 flex items-center gap-3">
-                <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-indigo-500/10 text-indigo-300 shrink-0 max-w-[140px] truncate">
+                <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-indigo-500/10 text-indigo-300 shrink-0 whitespace-nowrap">
                   {e.event_type}
                 </span>
                 <div className="flex-1 min-w-0">
                   {Object.keys(e.event_data ?? {}).length > 0 && (
-                    <p className="text-[10px] text-slate-600 font-mono truncate">
+                    <p className="text-[10px] text-slate-600 font-mono break-all line-clamp-2 leading-relaxed">
                       {JSON.stringify(e.event_data)}
                     </p>
                   )}

@@ -3,6 +3,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Search, ChevronLeft, ChevronRight, UserCircle2, Globe, Clock } from "lucide-react";
 import { flagEmoji, formatRelative } from "@/lib/utils";
+import Highlight from "@/components/ui/Highlight";
 import type { IpUser } from "@/types/analytics";
 
 interface Props {
@@ -18,7 +19,7 @@ function maskIp(ip: string) {
   const parts = ip.split(".");
   if (parts.length === 4) return `${parts[0]}.${parts[1]}.*.*`;
   const v6 = ip.split(":");
-  if (v6.length > 2) return `${v6[0]}:${v6[1]}:****`;
+  if (v6.length > 2) return `${v6[0]}:${v6[1]}:…`;
   return ip;
 }
 
@@ -70,7 +71,7 @@ export default function UsersTable({ users, total, page, search }: Props) {
           <thead>
             <tr className="border-b border-white/[0.04]">
               {["User", "Location", "Sessions", "Events", "First Seen", "Last Active"].map((h) => (
-                <th key={h} className="text-left px-5 py-3 text-[10px] font-semibold text-slate-600 uppercase tracking-widest">
+                <th key={h} className="text-left px-5 py-3 text-[10px] font-semibold text-slate-600 uppercase tracking-widest whitespace-nowrap">
                   {h}
                 </th>
               ))}
@@ -98,33 +99,39 @@ export default function UsersTable({ users, total, page, search }: Props) {
                       <UserCircle2 size={16} className="text-indigo-400" />
                     </div>
                     <div>
-                      <p className="text-xs font-mono text-slate-300 group-hover:text-indigo-300 transition-colors">
-                        {maskIp(user.ip_address)}
+                      <p className="text-xs font-mono text-slate-300 group-hover:text-indigo-300 transition-colors whitespace-nowrap">
+                        <Highlight text={maskIp(user.ip_address)} query={search} />
                       </p>
                       {user.city && (
-                        <p className="text-[10px] text-slate-600">{user.city}</p>
+                        <p className="text-[10px] text-slate-600">
+                          <Highlight text={user.city} query={search} />
+                        </p>
                       )}
                     </div>
                   </div>
                 </td>
 
                 {/* Location */}
-                <td className="px-5 py-3.5">
+                <td className="px-5 py-3.5 whitespace-nowrap">
                   <div className="flex items-center gap-2">
                     {user.country_code && (
-                      <span className="text-base">{flagEmoji(user.country_code)}</span>
+                      <span className="text-base shrink-0">{flagEmoji(user.country_code)}</span>
                     )}
                     <div>
-                      <p className="text-xs text-slate-300">{user.country ?? "Unknown"}</p>
+                      <p className="text-xs text-slate-300">
+                        <Highlight text={user.country ?? "Unknown"} query={search} />
+                      </p>
                       {user.region && (
-                        <p className="text-[10px] text-slate-600">{user.region}</p>
+                        <p className="text-[10px] text-slate-600">
+                          <Highlight text={user.region} query={search} />
+                        </p>
                       )}
                     </div>
                   </div>
                 </td>
 
                 {/* Sessions */}
-                <td className="px-5 py-3.5">
+                <td className="px-5 py-3.5 whitespace-nowrap">
                   <div className="flex items-center gap-1.5">
                     <span className="inline-flex items-center justify-center w-6 h-6 rounded-lg bg-violet-500/10 text-violet-400 text-xs font-bold">
                       {user.session_count > 99 ? "99+" : user.session_count}
@@ -134,24 +141,24 @@ export default function UsersTable({ users, total, page, search }: Props) {
                 </td>
 
                 {/* Events */}
-                <td className="px-5 py-3.5">
+                <td className="px-5 py-3.5 whitespace-nowrap">
                   <span className="text-xs font-semibold text-slate-200 tabular-nums">
                     {Number(user.total_events).toLocaleString()}
                   </span>
                 </td>
 
                 {/* First Seen */}
-                <td className="px-5 py-3.5">
+                <td className="px-5 py-3.5 whitespace-nowrap">
                   <div className="flex items-center gap-1.5 text-xs text-slate-500">
-                    <Globe size={11} />
+                    <Globe size={11} className="shrink-0" />
                     {formatRelative(user.first_seen)}
                   </div>
                 </td>
 
                 {/* Last Active */}
-                <td className="px-5 py-3.5">
+                <td className="px-5 py-3.5 whitespace-nowrap">
                   <div className="flex items-center gap-1.5 text-xs text-slate-400">
-                    <Clock size={11} />
+                    <Clock size={11} className="shrink-0" />
                     {formatRelative(user.last_seen)}
                   </div>
                 </td>

@@ -50,7 +50,7 @@ export async function GET() {
   const stats: OverviewStats = {
     totalEvents: totalEvents ?? 0,
     totalSessions: totalSessions ?? 0,
-    uniqueUsers: typeof uniqueUsersRaw === "number" ? uniqueUsersRaw : 0,
+    uniqueUsers: Number(uniqueUsersRaw ?? 0),
     uniqueCountries: topCountries.length,
     todayEvents: todayEvents ?? 0,
     activeSessionsLast24h: activeSessions ?? 0,

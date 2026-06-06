@@ -74,3 +74,40 @@ export const Events = {
 } as const;
 
 export type EventName = (typeof Events)[keyof typeof Events];
+
+/**
+ * Payload for AI_QUERY_SUCCESS — tracks token usage for cost estimation.
+ * Call this after every successful Claude API response.
+ *
+ * Example:
+ *   trackAiUsage({
+ *     model: "claude-sonnet-4-6",
+ *     inputTokens: response.usage.input_tokens,
+ *     outputTokens: response.usage.output_tokens,
+ *     durationMs: Date.now() - startTime,
+ *   });
+ */
+export interface AiUsagePayload {
+  model:        string;   // e.g. "claude-sonnet-4-6"
+  inputTokens:  number;
+  outputTokens: number;
+  durationMs?:  number;
+  errorCode?:   string;   // populated on AI_QUERY_ERROR
+}
+
+export async function trackAiUsage(payload: AiUsagePayload): Promise<void> {
+  await trackEvent(Events.AI_QUERY_SUCCESS, {
+    model:         payload.model,
+    input_tokens:  payload.inputTokens,
+    output_tokens: payload.outputTokens,
+    duration_ms:   payload.durationMs ?? null,
+  });
+}
+
+export async function trackAiError(payload: AiUsagePayload): Promise<void> {
+  await trackEvent(Events.AI_QUERY_ERROR, {
+    model:      payload.model,
+    error_code: payload.errorCode ?? "unknown",
+    duration_ms: payload.durationMs ?? null,
+  });
+}

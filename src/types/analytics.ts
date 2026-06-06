@@ -83,6 +83,26 @@ export interface IpUserProfile extends IpUser {
   platforms: string[];
 }
 
+export interface AiModelUsage {
+  model:              string;
+  query_count:        number;
+  input_tokens:       number;
+  output_tokens:      number;
+  total_tokens:       number;
+  estimated_cost_usd: number;
+}
+
+export interface AiUsageSummary extends AiModelUsage {
+  unique_users: number;
+}
+
+export interface AiCostTrend {
+  day:                string;
+  query_count:        number;
+  total_tokens:       number;
+  estimated_cost_usd: number;
+}
+
 export interface UserSession {
   id: string;
   app_version: string | null;
