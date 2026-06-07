@@ -13,9 +13,10 @@ export async function GET(req: NextRequest) {
 }
 
 const EntrySchema = z.object({
-  modelId: z.string().max(100).refine(id => SERVER_MODEL_IDS.has(id), 'Unknown model ID'),
-  weight:  z.number().int().min(0).max(100),
-  enabled: z.boolean(),
+  modelId:    z.string().max(100).refine(id => SERVER_MODEL_IDS.has(id), 'Unknown model ID'),
+  weight:     z.number().int().min(0).max(100),
+  enabled:    z.boolean(),
+  via9Router: z.boolean().optional().default(false),
 })
 
 const ConfigSchema = z.object({

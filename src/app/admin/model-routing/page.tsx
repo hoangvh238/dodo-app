@@ -2,9 +2,15 @@ export const dynamic = 'force-dynamic'
 
 import ModelRoutingEditor from '@/components/dashboard/ModelRoutingEditor'
 import { getRoutingConfig } from '@/lib/routing/modelRouting'
+import { getNineRouterConfig } from '@/lib/routing/nineRouter'
 
 export default async function ModelRoutingPage() {
-  const config = await getRoutingConfig()
+  const [config, nrCfg] = await Promise.all([
+    getRoutingConfig(),
+    getNineRouterConfig(),
+  ])
+  const nrConfigured = nrCfg.enabled && !!nrCfg.url
+
   return (
     <div className="space-y-4">
       <div>
@@ -13,7 +19,7 @@ export default async function ModelRoutingPage() {
           Configure how free-tier AI requests are distributed across providers and models.
         </p>
       </div>
-      <ModelRoutingEditor initialConfig={config} />
+      <ModelRoutingEditor initialConfig={config} nrConfigured={nrConfigured} />
     </div>
   )
 }

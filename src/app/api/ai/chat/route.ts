@@ -36,6 +36,14 @@ import { createServiceClient } from '@/lib/supabase/service'
 import { resolveModelId, getModel } from '@/lib/models'
 import { getApiKey } from '@/lib/config/apiKeys'
 import { resolveFreeTierModel } from '@/lib/routing/modelRouting'
+import { getNineRouterConfig, mapModelIdFor9Router } from '@/lib/routing/nineRouter'
+import { SIGNUP_BONUS_CREDITS } from '@/lib/credits/pricing'
+
+function getClientIp(req: NextRequest): string {
+  const fwd = req.headers.get('x-forwarded-for')
+  if (fwd) return fwd.split(',')[0].trim().replace(/^::ffff:/i, '')
+  return req.headers.get('x-real-ip') ?? 'unknown'
+}
 
 const CORS = {
   'Access-Control-Allow-Origin':  '*',
@@ -97,22 +105,37 @@ const RequestSchema = z.object({
 })
 
 // ─── Model resolver ───────────────────────────────────────────────────────────
-async function resolveServerModel(requestedId: string | undefined) {
+async function resolveServerModel(requestedId: string | undefined, via9Router = false) {
   const modelId = resolveModelId(requestedId)
   if (requestedId && requestedId !== modelId) {
     console.warn(`[models] unknown model "${requestedId}" → fallback to "${modelId}"`)
   }
+
+  // Route through 9router when enabled for this request
+  if (via9Router) {
+    const cfg = await getNineRouterConfig()
+    if (cfg.enabled && cfg.url) {
+      const mapped = mapModelIdFor9Router(modelId)
+      const client = createOpenAI({
+        baseURL: cfg.url.replace(/\/$/, '') + '/v1',
+        apiKey:  cfg.apiKey || 'sk_9router',
+      })
+      console.info(`[9router] routing "${modelId}" → "${mapped}" via ${cfg.url}`)
+      return { model: client(mapped), modelId: mapped, via9Router: true }
+    }
+  }
+
   const meta = getModel(modelId)!
   if (meta.provider === 'anthropic') {
     const { value: apiKey } = await getApiKey('anthropic')
-    return { model: createAnthropic({ apiKey })(modelId), modelId }
+    return { model: createAnthropic({ apiKey })(modelId), modelId, via9Router: false }
   }
   if (meta.provider === 'openai') {
     const { value: apiKey } = await getApiKey('openai')
-    return { model: createOpenAI({ apiKey })(modelId), modelId }
+    return { model: createOpenAI({ apiKey })(modelId), modelId, via9Router: false }
   }
   const { value: apiKey } = await getApiKey('google')
-  return { model: createGoogleGenerativeAI({ apiKey })(modelId), modelId }
+  return { model: createGoogleGenerativeAI({ apiKey })(modelId), modelId, via9Router: false }
 }
 
 // ─── Stream encoder ───────────────────────────────────────────────────────────
@@ -144,13 +167,22 @@ export async function POST(req: NextRequest) {
     .from('users').select('credits, plan_type').eq('google_sub', identity.sub).single()
 
   if (!userRow) {
-    // Auto-create user with signup bonus
+    // IP-aware signup bonus: same IP as an existing account → 1/3 bonus
+    const clientIp   = getClientIp(req)
+    const { data: ipCount } = await db.rpc('count_ip_accounts', {
+      p_ip:         clientIp,
+      p_exclude_sub: identity.sub,
+    })
+    const bonusFactor  = (ipCount && ipCount > 0) ? 1 / 3 : 1.0
+    const bonusCredits = Math.max(1, Math.floor(SIGNUP_BONUS_CREDITS * bonusFactor))
+
     await db.from('users').upsert({
       google_sub: identity.sub, email: identity.email,
-      credits: 50, signup_bonus_granted: true,
+      credits: bonusCredits, signup_bonus_granted: true,
+      signup_ip: clientIp, ip_bonus_factor: bonusFactor,
     }, { onConflict: 'google_sub' })
     await db.from('credit_transactions').insert({
-      user_id: identity.sub, amount: 50, reason: 'signup_bonus',
+      user_id: identity.sub, amount: bonusCredits, reason: 'signup_bonus',
     })
   } else if (userRow.credits < 1) {
     return NextResponse.json({
@@ -169,17 +201,26 @@ export async function POST(req: NextRequest) {
   }
 
   // Free-tier: server picks model via weighted routing config (admin-configurable).
+  // Each route entry carries its own via9Router flag — respected per-model.
   const isFreeTier = !userRow || userRow.plan_type === 'free' || !userRow.plan_type
   let requestedModel = body.model
+  let use9Router     = false
+
   if (isFreeTier) {
-    const routed = await resolveFreeTierModel()
-    if (body.model && body.model !== routed) {
-      console.info(`[routing] free-tier: "${body.model}" → "${routed}" for ${identity.sub}`)
+    const resolved = await resolveFreeTierModel()
+    if (body.model && body.model !== resolved.modelId) {
+      console.info(`[routing] free-tier: "${body.model}" → "${resolved.modelId}" for ${identity.sub}`)
     }
-    requestedModel = routed
+    requestedModel = resolved.modelId
+    // Per-entry flag: only use 9router if this specific route entry says so
+    // AND 9router is actually configured/enabled globally
+    if (resolved.via9Router) {
+      const nrCfg = await getNineRouterConfig()
+      use9Router  = nrCfg.enabled && !!nrCfg.url
+    }
   }
 
-  const { model, modelId } = await resolveServerModel(requestedModel)
+  const { model, modelId } = await resolveServerModel(requestedModel, use9Router)
   const googleSub          = identity.sub
 
   // 5. Pre-deduct 1 credit (reservation) — prevents concurrent free-rides
