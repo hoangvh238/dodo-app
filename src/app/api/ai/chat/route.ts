@@ -162,15 +162,15 @@ export async function POST(req: NextRequest) {
   }
 
   // 3. Credit guard — check user has credits
-  const db = createServiceClient()
+  const db        = createServiceClient()
+  const clientIp  = getClientIp(req)
   const { data: userRow } = await db
-    .from('users').select('credits, plan_type').eq('google_sub', identity.sub).single()
+    .from('users').select('credits, plan_type, signup_ip').eq('google_sub', identity.sub).single()
 
   if (!userRow) {
     // IP-aware signup bonus: same IP as an existing account → 1/3 bonus
-    const clientIp   = getClientIp(req)
     const { data: ipCount } = await db.rpc('count_ip_accounts', {
-      p_ip:         clientIp,
+      p_ip:          clientIp,
       p_exclude_sub: identity.sub,
     })
     const bonusFactor  = (ipCount && ipCount > 0) ? 1 / 3 : 1.0
@@ -184,12 +184,22 @@ export async function POST(req: NextRequest) {
     await db.from('credit_transactions').insert({
       user_id: identity.sub, amount: bonusCredits, reason: 'signup_bonus',
     })
-  } else if (userRow.credits < 1) {
-    return NextResponse.json({
-      error:   'Insufficient credits. Please top up to continue using Snapaha AI.',
-      code:    'INSUFFICIENT_CREDITS',
-      credits: userRow.credits,
-    }, { status: 402, headers: CORS })
+  } else {
+    // Backfill signup_ip for existing users who don't have it yet (one-time, fire-and-forget)
+    if (!userRow.signup_ip && clientIp !== 'unknown') {
+      db.from('users')
+        .update({ signup_ip: clientIp })
+        .eq('google_sub', identity.sub)
+        .then(() => {})
+    }
+
+    if (userRow.credits < 1) {
+      return NextResponse.json({
+        error:   'Insufficient credits. Please top up to continue using Snapaha AI.',
+        code:    'INSUFFICIENT_CREDITS',
+        credits: userRow.credits,
+      }, { status: 402, headers: CORS })
+    }
   }
 
   // 4. Parse + validate request
