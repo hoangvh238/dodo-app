@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
-import { Search, ChevronLeft, ChevronRight, CreditCard, Clock, User } from 'lucide-react'
+import { Search, ChevronLeft, ChevronRight, Clock, User } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface RegUser {

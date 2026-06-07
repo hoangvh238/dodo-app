@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic'
 
 import { createServiceClient } from '@/lib/supabase/service'
 import ApiKeysManager from '@/components/dashboard/ApiKeysManager'
+import ApiKeyTester from '@/components/dashboard/ApiKeyTester'
 import { maskKey } from '@/lib/config/apiKeys'
 
 const PROVIDERS = [
@@ -45,15 +46,25 @@ async function getKeyStatuses() {
 
 export default async function ApiKeysPage() {
   const keys = await getKeyStatuses()
+  const configuredProviders = new Set(
+    keys.filter(k => k.configured).map(k => k.provider)
+  ) as Set<'anthropic' | 'google' | 'openai'>
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-8">
       <div>
         <h1 className="text-2xl font-bold text-slate-100">API Keys</h1>
         <p className="text-slate-500 text-sm mt-0.5">
           Configure provider API keys. DB values override environment variables at runtime.
         </p>
       </div>
+
       <ApiKeysManager initialKeys={keys} />
+
+      {/* Divider */}
+      <div className="border-t border-white/[0.06]" />
+
+      <ApiKeyTester configuredProviders={configuredProviders} />
     </div>
   )
 }

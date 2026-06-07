@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, Globe, Activity, Users, LogOut,
   Package, ShieldAlert, UserCircle2, ChevronRight, Rocket, Image as ImageIcon,
-  CreditCard, Zap, Key,
+  CreditCard, Zap, Key, Shuffle,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
@@ -26,6 +26,7 @@ const NAV_GROUPS = [
     items: [
       { href: "/admin/registered-users", label: "Reg. Users",    icon: CreditCard },
       { href: "/admin/ai-usage",         label: "AI Usage",      icon: Zap },
+      { href: "/admin/model-routing",    label: "Model Routing", icon: Shuffle },
       { href: "/admin/api-keys",         label: "API Keys",      icon: Key },
     ],
   },

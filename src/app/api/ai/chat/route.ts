@@ -33,8 +33,9 @@ import { verifyGoogleToken, extractBearerToken } from '@/lib/auth/verifyGoogleTo
 import { deductCredits } from '@/lib/credits'
 import { calculateCredits } from '@/lib/credits/pricing'
 import { createServiceClient } from '@/lib/supabase/service'
-import { resolveModelId, getModel, FREE_TIER_MODEL_ID } from '@/lib/models'
+import { resolveModelId, getModel } from '@/lib/models'
 import { getApiKey } from '@/lib/config/apiKeys'
+import { resolveFreeTierModel } from '@/lib/routing/modelRouting'
 
 const CORS = {
   'Access-Control-Allow-Origin':  '*',
@@ -167,11 +168,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid request body' }, { status: 400, headers: CORS })
   }
 
-  // Free-tier users are restricted to the free model — silently override any other selection.
+  // Free-tier: server picks model via weighted routing config (admin-configurable).
   const isFreeTier = !userRow || userRow.plan_type === 'free' || !userRow.plan_type
-  const requestedModel = isFreeTier ? FREE_TIER_MODEL_ID : body.model
-  if (isFreeTier && body.model && body.model !== FREE_TIER_MODEL_ID) {
-    console.info(`[models] free-tier override: "${body.model}" → "${FREE_TIER_MODEL_ID}" for ${identity.sub}`)
+  let requestedModel = body.model
+  if (isFreeTier) {
+    const routed = await resolveFreeTierModel()
+    if (body.model && body.model !== routed) {
+      console.info(`[routing] free-tier: "${body.model}" → "${routed}" for ${identity.sub}`)
+    }
+    requestedModel = routed
   }
 
   const { model, modelId } = await resolveServerModel(requestedModel)
