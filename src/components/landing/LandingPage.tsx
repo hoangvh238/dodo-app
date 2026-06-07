@@ -13,7 +13,7 @@ import Link from "next/link";
 import {
   Download, Keyboard, SquareDashedMousePointer, Sparkles, ScanText,
   ListOrdered, UsersRound, Network, MessageSquareText, History,
-  Code2, GraduationCap, Mail, PenTool, Star, ArrowRight,
+  Code2, GraduationCap, Mail, PenTool, Star, ArrowRight, ArrowUp,
   Check, X, Lightbulb, Layers, Languages, RefreshCw, MousePointerClick, Eye,
   HelpCircle, Reply, FileText, WandSparkles, SpellCheck, GitPullRequest, Bug, Wrench, BookOpen,
   type LucideIcon,
@@ -122,21 +122,82 @@ function SectionEyebrow({ children, center = true }: { children: React.ReactNode
   );
 }
 
-// Cursor glow (follows mouse globally)
+// Cursor glow — two-layer: large ambient halo + tight bright core.
+// The core makes the effect feel physically present; the halo tints the scene.
 function CursorGlow() {
   const x = useMotionValue(-600);
   const y = useMotionValue(-600);
-  const bg = useMotionTemplate`radial-gradient(700px circle at ${x}px ${y}px, rgba(99,102,241,0.055), transparent 40%)`;
+  const xs = useSpring(x, { stiffness: 120, damping: 22 });
+  const ys = useSpring(y, { stiffness: 120, damping: 22 });
+  const bgAmbient = useMotionTemplate`radial-gradient(900px circle at ${xs}px ${ys}px, rgba(99,102,241,0.10), transparent 45%)`;
+  const bgCore    = useMotionTemplate`radial-gradient(160px circle at ${xs}px ${ys}px, rgba(139,92,246,0.18), transparent 70%)`;
   useEffect(() => {
     const h = (e: MouseEvent) => { x.set(e.clientX); y.set(e.clientY); };
     window.addEventListener("mousemove", h, { passive: true });
     return () => window.removeEventListener("mousemove", h);
   }, [x, y]);
   return (
-    <motion.div
-      className="pointer-events-none fixed inset-0 z-30"
-      style={{ background: bg }}
-    />
+    <>
+      <motion.div className="pointer-events-none fixed inset-0 z-30" style={{ background: bgAmbient }} />
+      <motion.div className="pointer-events-none fixed inset-0 z-30" style={{ background: bgCore }} />
+    </>
+  );
+}
+
+// Global parallax star-field + shooting stars.
+// Stars drift at 0.08× scroll speed (barely perceptible = feels "premium").
+// Shooting stars fire randomly on a staggered loop.
+function StarField() {
+  const { scrollY } = useScroll();
+  const y = useTransform(scrollY, [0, 6000], [0, -480]);
+  const stars = useMemo(
+    () => Array.from({ length: 70 }, (_, i) => ({
+      id: i,
+      left: (i * 79 + 13) % 100,
+      top: (i * 67 + 7) % 100,
+      size: i % 5 === 0 ? 3 : i % 3 === 0 ? 2 : 1.4,
+      opBase: 0.08 + (i % 6) * 0.05,
+      dur: 3.5 + (i % 7) * 1.3,
+      delay: i * 0.14,
+    })),
+    []
+  );
+  const shooters = useMemo(
+    () => Array.from({ length: 6 }, (_, i) => ({
+      id: i,
+      startX: 8 + i * 15,
+      startY: 3 + (i % 3) * 10,
+      angle: -25 - (i % 3) * 5,
+      length: 100 + i * 20,
+      dur: 0.7 + i * 0.08,
+      repeatDelay: 5 + i * 3.5,
+      delay: i * 2.2 + 0.5,
+    })),
+    []
+  );
+  return (
+    <motion.div className="pointer-events-none fixed inset-0 z-[5]" style={{ y }} aria-hidden>
+      {stars.map((s) => (
+        <motion.div key={s.id} className="absolute rounded-full"
+          style={{ left: `${s.left}%`, top: `${s.top}%`, width: s.size, height: s.size, background: "rgba(255,255,255,0.95)" }}
+          animate={{ opacity: [s.opBase * 0.4, s.opBase * 2.2, s.opBase * 0.4] }}
+          transition={{ duration: s.dur, repeat: Infinity, delay: s.delay, ease: "easeInOut" }}
+        />
+      ))}
+      {shooters.map((s) => (
+        <motion.div key={`sh${s.id}`}
+          style={{
+            position: "absolute", left: `${s.startX}%`, top: `${s.startY}%`,
+            width: s.length, height: 1.5,
+            background: "linear-gradient(90deg, rgba(255,255,255,0.9), rgba(129,140,248,0.6), transparent)",
+            transform: `rotate(${s.angle}deg)`, transformOrigin: "left center", borderRadius: 2,
+          }}
+          initial={{ opacity: 0, scaleX: 0, x: 0 }}
+          animate={{ opacity: [0, 1, 1, 0], scaleX: [0, 1, 1, 0], x: [0, s.length * 1.5] }}
+          transition={{ duration: s.dur, repeat: Infinity, repeatDelay: s.repeatDelay, delay: s.delay, ease: "easeOut" }}
+        />
+      ))}
+    </motion.div>
   );
 }
 
@@ -195,6 +256,220 @@ function Particles({ count = 40, y }: { count?: number; y?: MotionValue<number> 
         />
       ))}
     </motion.div>
+  );
+}
+
+// Perspective floor grid — converging SVG lines give the hero an infinite
+// 3D-space feel. Single highest-impact visual element on the page.
+function PerspectiveGrid({ yOffset }: { yOffset: MotionValue<number> }) {
+  return (
+    <motion.div className="pointer-events-none absolute inset-0 overflow-hidden" style={{ y: yOffset }} aria-hidden>
+      <motion.svg
+        viewBox="0 0 1440 900"
+        style={{ position: "absolute", bottom: 0, left: 0, width: "100%", height: "68%" }}
+        preserveAspectRatio="xMidYMax slice"
+        animate={{ opacity: [0.13, 0.21, 0.13] }}
+        transition={{ duration: 7, repeat: Infinity, ease: "easeInOut" }}
+      >
+        <defs>
+          <linearGradient id="pgFade" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={IND} stopOpacity="0" />
+            <stop offset="38%" stopColor={IND} stopOpacity="0.75" />
+            <stop offset="100%" stopColor={IND} stopOpacity="0.18" />
+          </linearGradient>
+        </defs>
+        {/* Radial lines only — clean vanishing-point rays, no horizontal clutter */}
+        {Array.from({ length: 28 }, (_, i) => {
+          const xBase = (i / 27) * 1440;
+          return <line key={`pv${i}`} x1={xBase} y1={900} x2={720} y2={0} stroke="url(#pgFade)" strokeWidth={i === 13 || i === 14 ? 0.9 : 0.45} />;
+        })}
+      </motion.svg>
+    </motion.div>
+  );
+}
+
+// 3D floating geometry — diamond, ring, hexagon, cross shapes at different
+// parallax depths. Each has its own rotation and float animation.
+function FloatingGeometry({ scrollYProgress }: { scrollYProgress: MotionValue<number> }) {
+  const yFast = useTransform(scrollYProgress, [0, 1], [0, -170]);
+  const yMid  = useTransform(scrollYProgress, [0, 1], [0, -95]);
+  const ySlow = useTransform(scrollYProgress, [0, 1], [0, -48]);
+  const rot1  = useTransform(scrollYProgress, [0, 1], [0, 150]);
+  const rot2  = useTransform(scrollYProgress, [0, 1], [0, -90]);
+
+  const shapes = useMemo(() => [
+    { id: 0, yMv: "fast", rotMv: "r1", pos: { right: "7%",  top: "18%" }, size: 90,  color: IND,       type: "diamond", floatAmt: 14, floatDur: 6.2 },
+    { id: 1, yMv: "mid",  rotMv: "r2", pos: { left:  "6%",  top: "44%" }, size: 66,  color: "#8b5cf6",  type: "ring",    floatAmt: 10, floatDur: 7.8 },
+    { id: 2, yMv: "slow", rotMv: "r1", pos: { left:  "17%", top: "21%" }, size: 38,  color: SPARK,      type: "diamond", floatAmt: 7,  floatDur: 5.1 },
+    { id: 3, yMv: "mid",  rotMv: "r2", pos: { right: "17%", top: "62%" }, size: 56,  color: IND_BRIGHT, type: "hex",     floatAmt: 11, floatDur: 7.3 },
+    { id: 4, yMv: "fast", rotMv: "r1", pos: { right: "36%", top: "79%" }, size: 28,  color: IND_BRIGHT, type: "ring",    floatAmt: 6,  floatDur: 4.6 },
+    { id: 5, yMv: "slow", rotMv: "r2", pos: { left:  "41%", top: "11%" }, size: 44,  color: "#8b5cf6",  type: "cross",   floatAmt: 9,  floatDur: 6.8 },
+    { id: 6, yMv: "mid",  rotMv: "r1", pos: { left:  "3%",  top: "75%" }, size: 52,  color: IND,        type: "hex",     floatAmt: 8,  floatDur: 8.1 },
+    { id: 7, yMv: "fast", rotMv: "r2", pos: { right: "5%",  top: "38%" }, size: 34,  color: SPARK,      type: "diamond", floatAmt: 12, floatDur: 5.5 },
+  ], []);
+
+  const yMap = { fast: yFast, mid: yMid, slow: ySlow };
+  const rMap = { r1: rot1, r2: rot2 };
+
+  return (
+    <div className="pointer-events-none absolute inset-0 overflow-hidden" style={{ perspective: "1200px" }} aria-hidden>
+      {shapes.map((s) => (
+        <motion.div key={s.id}
+          style={{ position: "absolute", ...s.pos, y: yMap[s.yMv as keyof typeof yMap], rotate: rMap[s.rotMv as keyof typeof rMap], willChange: "transform", transformStyle: "preserve-3d" }}>
+          <motion.div
+            animate={{ y: [0, -s.floatAmt, 0], rotateX: [0, 12, 0, -8, 0], rotateZ: [0, 3, 0, -3, 0] }}
+            transition={{ duration: s.floatDur, repeat: Infinity, ease: "easeInOut", delay: s.id * 0.55 }}
+            style={{ transformStyle: "preserve-3d" }}>
+            {s.type === "diamond" && (
+              <motion.div
+                style={{ width: s.size, height: s.size, border: `1.5px solid ${s.color}55`, background: `linear-gradient(135deg, ${s.color}12 0%, transparent 60%)`, transform: "rotate(45deg)" }}
+                animate={{ boxShadow: [`0 0 ${s.size * 0.3}px ${s.color}20`, `0 0 ${s.size * 0.75}px ${s.color}58`, `0 0 ${s.size * 0.3}px ${s.color}20`] }}
+                transition={{ duration: 3, repeat: Infinity, ease: "easeInOut", delay: s.id * 0.4 }}
+              />
+            )}
+            {s.type === "ring" && (
+              <motion.div
+                style={{ width: s.size, height: s.size, borderRadius: "50%", border: `1.5px solid ${s.color}50` }}
+                animate={{ boxShadow: [`0 0 ${s.size * 0.4}px ${s.color}15`, `0 0 ${s.size * 0.9}px ${s.color}52`, `0 0 ${s.size * 0.4}px ${s.color}15`] }}
+                transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut", delay: s.id * 0.3 }}
+              />
+            )}
+            {s.type === "hex" && (
+              <svg width={s.size} height={s.size} viewBox="0 0 100 100">
+                <motion.polygon points="50,5 95,27.5 95,72.5 50,95 5,72.5 5,27.5" fill="none" stroke={s.color} strokeWidth="1.5"
+                  animate={{ strokeOpacity: [0.22, 0.72, 0.22], filter: [`drop-shadow(0 0 4px ${s.color}25)`, `drop-shadow(0 0 14px ${s.color}65)`, `drop-shadow(0 0 4px ${s.color}25)`] }}
+                  transition={{ duration: 3.2, repeat: Infinity, ease: "easeInOut", delay: s.id * 0.35 }}
+                />
+              </svg>
+            )}
+            {s.type === "cross" && (
+              <svg width={s.size} height={s.size} viewBox="0 0 100 100">
+                <motion.line x1="50" y1="8" x2="50" y2="92" stroke={s.color} strokeWidth="1.5"
+                  animate={{ strokeOpacity: [0.18, 0.68, 0.18] }}
+                  transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }} />
+                <motion.line x1="8" y1="50" x2="92" y2="50" stroke={s.color} strokeWidth="1.5"
+                  animate={{ strokeOpacity: [0.18, 0.68, 0.18] }}
+                  transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut", delay: 0.5 }} />
+              </svg>
+            )}
+          </motion.div>
+        </motion.div>
+      ))}
+    </div>
+  );
+}
+
+
+// Scroll-to-top button — appears after first scroll, springs back to top.
+function ScrollToTop() {
+  const { scrollY } = useScroll();
+  const [visible, setVisible] = useState(false);
+  useMotionValueEvent(scrollY, "change", (v) => setVisible(v > 400));
+  return (
+    <AnimatePresence>
+      {visible && (
+        <motion.button
+          initial={{ opacity: 0, y: 20, scale: 0.8 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: 20, scale: 0.8 }}
+          transition={{ type: "spring", stiffness: 380, damping: 28 }}
+          onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+          className="fixed z-[80] bottom-6 right-6 w-11 h-11 rounded-full flex items-center justify-center"
+          style={{ background: `linear-gradient(135deg, ${IND} 0%, #7c3aed 100%)`, boxShadow: "0 0 28px rgba(99,102,241,0.6)", border: "1px solid rgba(129,140,248,0.35)" }}
+          whileHover={{ scale: 1.14, boxShadow: "0 0 44px rgba(99,102,241,0.85)" }}
+          whileTap={{ scale: 0.9 }}
+          aria-label="Scroll to top"
+        >
+          <ArrowUp size={17} color="white" strokeWidth={2.5} />
+        </motion.button>
+      )}
+    </AnimatePresence>
+  );
+}
+
+// Multi-layer parallax background — self-contained (absolute inset-0, so it tracks
+// its parent section's scroll naturally). Drop it as the first child of any
+// `relative overflow-hidden` section to get instant 3D depth.
+function ParallaxBg({
+  orb1Color = "rgba(99,102,241,0.18)",
+  orb2Color = "rgba(139,92,246,0.12)",
+  orb3Color = "rgba(59,130,246,0.09)",
+  particleCount = 11,
+  showRings = false,
+  showBeams = false,
+}: {
+  orb1Color?: string;
+  orb2Color?: string;
+  orb3Color?: string;
+  particleCount?: number;
+  showRings?: boolean;
+  showBeams?: boolean;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const { scrollYProgress } = useScroll({ target: ref, offset: ["start end", "end start"] });
+
+  const y1 = useTransform(scrollYProgress, [0, 1], ["-12%", "12%"]);
+  const y2 = useTransform(scrollYProgress, [0, 1], ["-22%", "22%"]);
+  const y3 = useTransform(scrollYProgress, [0, 1], ["-36%", "36%"]);
+  const x1 = useTransform(scrollYProgress, [0, 1], ["-5%", "5%"]);
+  const x2 = useTransform(scrollYProgress, [0, 1], ["5%", "-5%"]);
+  const rot = useTransform(scrollYProgress, [0, 1], [-18, 18]);
+  const sc  = useTransform(scrollYProgress, [0, 0.5, 1], [0.82, 1.12, 0.82]);
+
+  const particles = useMemo(
+    () => Array.from({ length: particleCount }, (_, i) => ({
+      id: i,
+      px: 5 + (i * 83 + 17) % 90,
+      py: 5 + (i * 67 + 11) % 90,
+      size: 1.5 + (i % 3 === 0 ? 2 : 1),
+      dur: 3.5 + (i % 5) * 1.3,
+      delay: i * 0.65,
+    })),
+    [particleCount]
+  );
+  const beamData = useMemo(
+    () => Array.from({ length: 3 }, (_, i) => ({
+      id: i, left: 15 + i * 32,
+      skew: i % 2 === 0 ? -14 : 14,
+      color: [IND, "#8b5cf6", IND_BRIGHT][i],
+      dur: 4 + i * 1.2, delay: i * 1.8,
+    })),
+    []
+  );
+
+  return (
+    <div ref={ref} className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
+      {/* Deep slow orb — top-left */}
+      <motion.div style={{ y: y1, x: x1, position: "absolute", width: 960, height: 960, left: "-28%", top: "-35%", borderRadius: "50%", background: `radial-gradient(circle, ${orb1Color} 0%, transparent 62%)`, filter: "blur(120px)", willChange: "transform" }} />
+      {/* Mid orb — right */}
+      <motion.div style={{ y: y2, x: x2, position: "absolute", width: 640, height: 640, right: "-14%", top: "0%", borderRadius: "50%", background: `radial-gradient(circle, ${orb2Color} 0%, transparent 68%)`, filter: "blur(90px)", willChange: "transform" }} />
+      {/* Fast fg orb — bottom-left */}
+      <motion.div style={{ y: y3, position: "absolute", width: 520, height: 520, left: "3%", bottom: "-20%", borderRadius: "50%", background: `radial-gradient(circle, ${orb3Color} 0%, transparent 70%)`, filter: "blur(75px)", willChange: "transform" }} />
+      {/* Fourth orb — bottom-right for balance */}
+      <motion.div style={{ y: y2, x: x1, position: "absolute", width: 400, height: 400, right: "-8%", bottom: "-10%", borderRadius: "50%", background: `radial-gradient(circle, ${orb1Color} 0%, transparent 65%)`, filter: "blur(70px)", willChange: "transform" }} />
+      {/* Rotating decorative ring */}
+      <motion.div style={{ y: y2, rotate: rot, scale: sc, position: "absolute", width: 360, height: 360, right: "16%", bottom: "10%", borderRadius: "50%", border: "1px solid rgba(99,102,241,0.14)", background: "radial-gradient(circle, rgba(99,102,241,0.05) 0%, transparent 60%)", willChange: "transform" }} />
+      {/* Smaller depth ring */}
+      <motion.div style={{ y: y1, rotate: rot, position: "absolute", width: 220, height: 220, left: "28%", top: "12%", borderRadius: "50%", border: "1px solid rgba(139,92,246,0.1)", willChange: "transform" }} />
+      {showRings && (
+        <motion.div style={{ y: y2 }} className="absolute inset-0 flex items-center justify-center">
+          <div style={{ position: "relative", width: 580, height: 580 }}>
+            <div style={{ position: "absolute", inset: 0, borderRadius: "50%", border: "1px solid rgba(99,102,241,0.09)" }} />
+            <div style={{ position: "absolute", inset: "14%", borderRadius: "50%", border: "1px solid rgba(139,92,246,0.07)" }} />
+            <div style={{ position: "absolute", inset: "29%", borderRadius: "50%", border: "1px solid rgba(99,102,241,0.05)" }} />
+          </div>
+        </motion.div>
+      )}
+      <motion.div style={{ y: y3 }} className="absolute inset-0">
+        {particles.map((p) => (
+          <motion.div key={p.id} className="absolute rounded-full"
+            style={{ left: `${p.px}%`, top: `${p.py}%`, width: p.size, height: p.size, background: IND_BRIGHT }}
+            animate={{ opacity: [0.05, 0.65, 0.05], y: [0, -32, 0] }}
+            transition={{ duration: p.dur, repeat: Infinity, delay: p.delay, ease: "easeInOut" }}
+          />
+        ))}
+      </motion.div>
+    </div>
   );
 }
 
@@ -289,18 +564,24 @@ function TiltCard({ children, className = "", style = {} }: {
     const r = el.getBoundingClientRect();
     const nx = (e.clientX - r.left) / r.width - 0.5;
     const ny = (e.clientY - r.top) / r.height - 0.5;
-    ry.set(nx * 14);
-    rx.set(-ny * 14);
+    ry.set(nx * 20);
+    rx.set(-ny * 20);
   };
+
+  // Dynamic z-depth shadow that follows the tilt — sells the 3D lift
+  const shadowX = useTransform(ryS, [-20, 20], [-18, 18]);
+  const shadowY = useTransform(rxS, [-20, 20], [18, -18]);
+  const boxShadow = useMotionTemplate`${shadowX}px ${shadowY}px 40px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,255,255,0.05)`;
 
   return (
     <motion.div
       ref={ref}
       className={className}
-      style={{ ...style, rotateX: rxS, rotateY: ryS, transformPerspective: 900 }}
+      style={{ ...style, rotateX: rxS, rotateY: ryS, transformPerspective: 700, boxShadow }}
       onMouseMove={handleMove}
       onMouseLeave={() => { rx.set(0); ry.set(0); }}
-      whileHover={{ scale: 1.02 }}
+      whileHover={{ scale: 1.03, z: 30 }}
+      transition={{ type: "spring", stiffness: 300, damping: 22 }}
     >
       {children}
     </motion.div>
@@ -571,9 +852,24 @@ function HowItWorksScroll() {
   const ansScale = useTransform(scrollYProgress, [0.64, 0.76], [0.94, 1]);
   const railFill = useTransform(scrollYProgress, [0.05, 0.95], ["0%", "100%"]);
 
+  // Extra parallax layers driven by how-it-works scroll
+  const bgOrb1X = useTransform(scrollYProgress, [0, 1], ["-8%", "8%"]);
+  const bgOrb1Y = useTransform(scrollYProgress, [0, 1], ["-12%", "12%"]);
+  const bgOrb2X = useTransform(scrollYProgress, [0, 1], ["6%", "-6%"]);
+  const bgOrb2Y = useTransform(scrollYProgress, [0, 1], ["8%", "-8%"]);
+  const bgRingRot = useTransform(scrollYProgress, [0, 1], [-20, 20]);
+  const bgRingScale = useTransform(scrollYProgress, [0, 0.5, 1], [0.8, 1.1, 0.8]);
+
   return (
     <section ref={ref} id="how-it-works" style={{ height: "340vh", background: BG }} className="relative">
       <div className="sticky top-0 h-screen flex flex-col items-center justify-center px-5 overflow-hidden">
+        {/* Deep parallax orbs driven by section scroll */}
+        <motion.div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
+          <motion.div style={{ x: bgOrb1X, y: bgOrb1Y, position: "absolute", width: 650, height: 650, left: "-20%", top: "-25%", borderRadius: "50%", background: "radial-gradient(circle, rgba(99,102,241,0.12) 0%, transparent 65%)", filter: "blur(100px)", willChange: "transform" }} />
+          <motion.div style={{ x: bgOrb2X, y: bgOrb2Y, position: "absolute", width: 400, height: 400, right: "-10%", bottom: "0%", borderRadius: "50%", background: "radial-gradient(circle, rgba(139,92,246,0.09) 0%, transparent 70%)", filter: "blur(70px)", willChange: "transform" }} />
+          <motion.div style={{ rotate: bgRingRot, scale: bgRingScale, position: "absolute", width: 340, height: 340, right: "12%", top: "15%", borderRadius: "50%", border: "1px solid rgba(99,102,241,0.1)", willChange: "transform" }} />
+          <motion.div style={{ x: bgOrb1X, position: "absolute", width: 200, height: 200, left: "25%", bottom: "8%", borderRadius: "50%", border: "1px solid rgba(139,92,246,0.07)", willChange: "transform" }} />
+        </motion.div>
         {/* soft moving glow tied to nothing but ambience */}
         <div className="pointer-events-none absolute inset-0"
           style={{ background: "radial-gradient(ellipse 60% 50% at 50% 45%, rgba(99,102,241,0.1), transparent 65%)" }} />
@@ -677,11 +973,16 @@ function ScreenDemo() {
   const t = useT();
   const ref = useRef<HTMLElement>(null);
   const inView = useInView(ref, { once: true, margin: "-120px" });
-  // Section-scroll parallax: card and glow drift at different speeds.
+  // Section-scroll parallax: 4 distinct layers at different depths.
   const { scrollYProgress } = useScroll({ target: ref, offset: ["start end", "end start"] });
   const cardY = useTransform(scrollYProgress, [0, 1], [70, -70]);
   const glowY = useTransform(scrollYProgress, [0, 1], [80, -140]);
   const cardRotX = useTransform(scrollYProgress, [0, 0.5, 1], [6, 0, -6]);
+  const orb1X = useTransform(scrollYProgress, [0, 1], ["-6%", "6%"]);
+  const orb2X = useTransform(scrollYProgress, [0, 1], ["5%", "-5%"]);
+  const orb1Y = useTransform(scrollYProgress, [0, 1], ["-10%", "10%"]);
+  const orb2Y = useTransform(scrollYProgress, [0, 1], ["8%", "-8%"]);
+  const ringRot = useTransform(scrollYProgress, [0, 1], [-15, 15]);
   const [phase, setPhase] = useState<DemoPhase>("idle");
   const [action, setAction] = useState(0);
   const [hasRun, setHasRun] = useState(false);
@@ -720,13 +1021,20 @@ function ScreenDemo() {
 
   return (
     <section ref={ref} className="relative py-24 px-5 overflow-hidden" style={{ background: "#090912" }}>
-      <motion.div className="pointer-events-none absolute inset-0" style={{ y: glowY }}>
+      {/* Layer 1 — deep slow glow */}
+      <motion.div className="pointer-events-none absolute inset-0 overflow-hidden" style={{ y: glowY }} aria-hidden>
         <div className="absolute inset-0"
           style={{ background: "radial-gradient(ellipse 70% 60% at 50% 40%, rgba(99,102,241,0.14) 0%, transparent 65%)" }} />
         <div className="absolute left-[12%] top-[30%] w-40 h-40 rounded-full"
           style={{ background: "radial-gradient(circle, rgba(251,191,36,0.12), transparent 70%)", filter: "blur(40px)" }} />
         <div className="absolute right-[10%] bottom-[18%] w-52 h-52 rounded-full"
           style={{ background: "radial-gradient(circle, rgba(139,92,246,0.14), transparent 70%)", filter: "blur(50px)" }} />
+      </motion.div>
+      {/* Layer 2 — mid depth, opposing horizontal drift */}
+      <motion.div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
+        <motion.div style={{ x: orb1X, y: orb1Y, position: "absolute", width: 600, height: 600, left: "-15%", top: "-20%", borderRadius: "50%", background: "radial-gradient(circle, rgba(99,102,241,0.1) 0%, transparent 65%)", filter: "blur(90px)", willChange: "transform" }} />
+        <motion.div style={{ x: orb2X, y: orb2Y, position: "absolute", width: 380, height: 380, right: "-8%", bottom: "-5%", borderRadius: "50%", background: "radial-gradient(circle, rgba(139,92,246,0.1) 0%, transparent 70%)", filter: "blur(65px)", willChange: "transform" }} />
+        <motion.div style={{ rotate: ringRot, position: "absolute", width: 260, height: 260, left: "60%", top: "20%", borderRadius: "50%", border: "1px solid rgba(99,102,241,0.1)", willChange: "transform" }} />
       </motion.div>
 
       <div className="relative z-10 max-w-4xl mx-auto">
@@ -997,17 +1305,13 @@ function BetaSection({ downloadUrl, betaConfig }: { downloadUrl: string; betaCon
 
   return (
     <section className="relative py-24 px-5 overflow-hidden" style={{ background: "#06060e" }}>
+      <ParallaxBg orb1Color="rgba(99,102,241,0.12)" orb2Color="rgba(34,197,94,0.05)" orb3Color="rgba(139,92,246,0.08)" particleCount={10} />
       {/* BG radial glow */}
       <div className="pointer-events-none absolute inset-0"
         style={{ background: "radial-gradient(ellipse 85% 65% at 50% 50%, rgba(99,102,241,0.15) 0%, transparent 62%)" }} />
       <div className="pointer-events-none absolute inset-0 grid-bg" style={{ opacity: 0.35 }} />
       <Particles count={18} />
 
-      {/* Edge lines */}
-      <div className="absolute top-0 inset-x-0 h-px"
-        style={{ background: "linear-gradient(90deg, transparent 5%, rgba(99,102,241,0.55) 50%, transparent 95%)" }} />
-      <div className="absolute bottom-0 inset-x-0 h-px"
-        style={{ background: "linear-gradient(90deg, transparent 10%, rgba(99,102,241,0.25) 50%, transparent 90%)" }} />
 
       <div className="relative z-10 max-w-4xl mx-auto text-center">
 
@@ -1341,8 +1645,12 @@ function Nav({ downloadUrl }: { downloadUrl: string }) {
     >
       <div className="max-w-6xl mx-auto px-5 h-full flex items-center justify-between">
         <div className="flex items-center gap-2.5">
-          <Image src="/icon.png" alt="SnapAha" width={28} height={28} className="rounded-lg" style={{ filter: "drop-shadow(0 0 8px rgba(99,102,241,0.5))" }} />
-          <Wordmark size={14} />
+          <motion.div className="rounded-xl overflow-hidden shrink-0" style={{ width: 32, height: 32 }}
+            animate={{ boxShadow: ["0 0 10px rgba(99,102,241,0.4)", "0 0 22px rgba(99,102,241,0.75)", "0 0 10px rgba(99,102,241,0.4)"] }}
+            transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}>
+            <Image src="/icon.png" alt="SnapAha" width={32} height={32} className="rounded-xl" />
+          </motion.div>
+          <Wordmark size={17} />
         </div>
         <div className="hidden md:flex gap-7">
           {links.map((l) => (
@@ -1434,7 +1742,7 @@ function HeadlineLine({ text, amber, highlight, baseDelay }: {
   const hlAt = baseDelay + words.length * 0.09 + 0.2;
   return (
     <span className="block">
-      <span className="relative inline-block">
+      <span className="relative inline-block" style={{ overflow: "visible"}}>
         {/* highlighter selection sweeping across the question */}
         {highlight && (
           <motion.span aria-hidden className="absolute rounded-md overflow-hidden -z-10"
@@ -1493,7 +1801,7 @@ function HeadlineLine({ text, amber, highlight, baseDelay }: {
 function TypedHeadline() {
   const t = useT();
   return (
-    <h1 className="font-bold leading-[1.02]" style={{ fontSize: "clamp(44px, 8vw, 96px)", letterSpacing: "-0.045em" }}>
+    <h1 className="font-bold overflow-visible" style={{ fontSize: "clamp(44px, 8vw, 96px)", letterSpacing: "-0.045em", lineHeight: 1.3 }}>
       <HeadlineLine text={t.hero.line1} highlight baseDelay={0.2} />
       <HeadlineLine text={t.hero.line2} amber baseDelay={1.25} />
     </h1>
@@ -1723,15 +2031,19 @@ function LandingBody() {
 
   // Hero-local scroll progress drives the multi-layer parallax.
   const { scrollYProgress } = useScroll({ target: heroRef, offset: ["start start", "end start"] });
-  const heroOpacity = useTransform(scrollYProgress, [0, 0.85], [1, 0.25]);
-  const auroraY = useTransform(scrollYProgress, [0, 1], [0, 340]);       // deep background drifts slowest
-  const gridY = useTransform(scrollYProgress, [0, 1], [0, 110]);         // mid layer
-  const particlesY = useTransform(scrollYProgress, [0, 1], [0, 190]);
-  const copyY = useTransform(scrollYProgress, [0, 1], [0, -120]);         // text floats up out of frame
-  const copyScale = useTransform(scrollYProgress, [0, 1], [1, 0.94]);
-  const demoY = useTransform(scrollYProgress, [0, 1], [0, 170]);          // foreground demo drifts down
-  const demoRotate = useTransform(scrollYProgress, [0, 1], [0, -4]);
-  const demoScale = useTransform(scrollYProgress, [0, 1], [1, 1.05]);
+  const heroOpacity  = useTransform(scrollYProgress, [0, 0.85], [1, 0.25]);
+  const auroraY      = useTransform(scrollYProgress, [0, 1], [0, 340]);   // deepest — barely moves
+  const perspGridY   = useTransform(scrollYProgress, [0, 1], [0, 65]);    // floor grid — slow
+  const gridY        = useTransform(scrollYProgress, [0, 1], [0, 110]);
+  const particlesY   = useTransform(scrollYProgress, [0, 1], [0, 190]);
+  const copyY        = useTransform(scrollYProgress, [0, 1], [0, -120]);
+  const copyScale    = useTransform(scrollYProgress, [0, 1], [1, 0.94]);
+  const demoY        = useTransform(scrollYProgress, [0, 1], [0, 170]);
+  const demoRotate   = useTransform(scrollYProgress, [0, 1], [0, -4]);
+  const demoScale    = useTransform(scrollYProgress, [0, 1], [1, 1.05]);
+  // 3D scroll tilt: hero copy tilts forward as you scroll out
+  const copyRotX     = useTransform(scrollYProgress, [0, 0.6], [0, 18]);
+  const copyZ        = useTransform(scrollYProgress, [0, 0.6], [0, -60]);
 
   const [galleryItems, setGalleryItems] = useState<GalleryItem[]>([]);
 
@@ -1778,19 +2090,59 @@ function LandingBody() {
     <div style={{ background: BG, color: "#f8fafc", fontFamily: "var(--font-inter)" }}>
       <GrainOverlay />
       <ScrollProgress />
+      <StarField />
       <CursorGlow />
+      <ScrollToTop />
       <Nav downloadUrl={downloadUrl} />
       <StickyCTA downloadUrl={downloadUrl} version={latestVersion} />
 
       {/* HERO */}
       <section ref={heroRef} className="relative flex flex-col items-center justify-center text-center overflow-hidden min-h-screen px-5 pt-24 pb-20"
-        style={{ background: `linear-gradient(180deg, ${BG} 0%, #0a0a14 60%, ${BG} 100%)` }}>
+        style={{ background: `linear-gradient(180deg, ${BG} 0%, #0a0a14 60%, ${BG} 100%)`, perspective: "1200px", perspectiveOrigin: "50% 40%" }}>
         <Aurora y={auroraY} />
-        <Particles count={55} y={particlesY} />
+        <PerspectiveGrid yOffset={perspGridY} />
+        <Particles count={65} y={particlesY} />
+        <FloatingGeometry scrollYProgress={scrollYProgress} />
         {/* Grid (mid parallax layer) */}
         <motion.div className="pointer-events-none absolute inset-0 grid-bg" style={{ y: gridY }} />
 
-        <motion.div style={{ opacity: heroOpacity, y: copyY, scale: copyScale }} className="relative z-10 w-full max-w-4xl mx-auto">
+        <motion.div style={{ opacity: heroOpacity, y: copyY, scale: copyScale, rotateX: copyRotX, z: copyZ, transformPerspective: 1000 }} className="relative z-10 w-full max-w-4xl mx-auto">
+
+          {/* ── SnapAha brand mark ─────────────────────────────────────── */}
+          <motion.div
+            initial={{ opacity: 0, y: 16, scale: 0.92 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ delay: 0, duration: 0.65, ease: [0.22, 1, 0.36, 1] }}
+            className="flex items-center justify-center gap-3.5 mb-8"
+          >
+            {/* App icon with breathing glow ring */}
+            <motion.div className="relative shrink-0"
+              animate={{ scale: [1, 1.05, 1] }} transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut" }}>
+              <motion.div className="absolute -inset-1 rounded-2xl"
+                style={{ background: `radial-gradient(circle, ${IND}70 0%, transparent 70%)`, filter: "blur(8px)" }}
+                animate={{ opacity: [0.6, 1, 0.6] }} transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut" }} />
+              <div className="relative rounded-2xl overflow-hidden"
+                style={{ width: 54, height: 54, boxShadow: `0 0 0 1px rgba(99,102,241,0.45), 0 8px 32px rgba(0,0,0,0.5)` }}>
+                <Image src="/icon.png" alt="SnapAha" width={54} height={54} className="rounded-2xl" />
+              </div>
+            </motion.div>
+
+            {/* Name + tagline */}
+            <div className="text-left">
+              <motion.p className="font-bold leading-none mb-1" style={{ fontSize: 30, letterSpacing: "-1px" }}>
+                <span className="text-white">Snap</span>
+                <motion.span
+                  style={{ backgroundImage: `linear-gradient(110deg, ${SPARK_BRIGHT} 0%, ${SPARK} 45%, ${SPARK_BRIGHT} 100%)`, backgroundSize: "200% auto", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", backgroundClip: "text" }}
+                  animate={{ backgroundPosition: ["0% center", "200% center"] }}
+                  transition={{ duration: 2.8, repeat: Infinity, ease: "linear" }}>Aha</motion.span>
+              </motion.p>
+              <p className="text-[11px] font-medium tracking-wide" style={{ color: "rgba(255,255,255,0.35)", letterSpacing: "0.06em" }}>
+                AI OVERLAY · WINDOWS
+              </p>
+            </div>
+          </motion.div>
+          {/* ────────────────────────────────────────────────────────────── */}
+
           {/* Badge */}
           <motion.div
             initial={{ opacity: 0, y: 12 }}
@@ -1948,8 +2300,9 @@ function LandingBody() {
       <BetaSection downloadUrl={downloadUrl} betaConfig={betaConfig} />
 
       {/* PROBLEM */}
-      <section className="py-24 px-5" style={{ background: "#0b0b16" }}>
-        <div className="max-w-5xl mx-auto text-center">
+      <section className="py-24 px-5 relative overflow-hidden" style={{ background: "#0b0b16" }}>
+        <ParallaxBg orb1Color="rgba(239,68,68,0.07)" orb2Color="rgba(99,102,241,0.1)" orb3Color="rgba(139,92,246,0.06)" />
+        <div className="max-w-5xl mx-auto text-center relative z-10">
           <Fade>
             <SectionEyebrow>{t.problem.eyebrow}</SectionEyebrow>
             <h2 className="font-bold text-white mb-6" style={{ fontSize: "clamp(28px, 5vw, 56px)", letterSpacing: "-0.045em", lineHeight: 1.1 }}>
@@ -1973,8 +2326,9 @@ function LandingBody() {
       <HowItWorksScroll />
 
       {/* FEATURES */}
-      <section id="features" className="py-24 px-5" style={{ background: "#0b0b16" }}>
-        <div className="max-w-5xl mx-auto">
+      <section id="features" className="py-24 px-5 relative overflow-hidden" style={{ background: "#0b0b16" }}>
+        <ParallaxBg orb1Color="rgba(99,102,241,0.14)" orb2Color="rgba(139,92,246,0.09)" showRings showBeams />
+        <div className="max-w-5xl mx-auto relative z-10">
           <Fade className="text-center mb-12">
             <SectionEyebrow>{t.features.eyebrow}</SectionEyebrow>
             <h2 className="font-bold text-white" style={{ fontSize: "clamp(28px, 5vw, 52px)", letterSpacing: "-0.045em" }}>
@@ -1990,8 +2344,9 @@ function LandingBody() {
       </section>
 
       {/* USE CASES */}
-      <section id="use-cases" className="py-24 px-5" style={{ background: BG }}>
-        <div className="max-w-4xl mx-auto">
+      <section id="use-cases" className="py-24 px-5 relative overflow-hidden" style={{ background: BG }}>
+        <ParallaxBg orb1Color="rgba(99,102,241,0.11)" orb2Color="rgba(251,191,36,0.06)" orb3Color="rgba(139,92,246,0.07)" />
+        <div className="max-w-4xl mx-auto relative z-10">
           <Fade className="text-center mb-10">
             <SectionEyebrow>{t.useCases.eyebrow}</SectionEyebrow>
             <h2 className="font-bold text-white" style={{ fontSize: "clamp(28px, 5vw, 52px)", letterSpacing: "-0.045em" }}>
@@ -2003,8 +2358,9 @@ function LandingBody() {
       </section>
 
       {/* SOCIAL PROOF */}
-      <section className="py-24 px-5" style={{ background: "#0b0b16" }}>
-        <div className="max-w-5xl mx-auto">
+      <section className="py-24 px-5 relative overflow-hidden" style={{ background: "#0b0b16" }}>
+        <ParallaxBg orb1Color="rgba(251,191,36,0.07)" orb2Color="rgba(99,102,241,0.1)" orb3Color="rgba(16,185,129,0.05)" particleCount={12} showRings showBeams />
+        <div className="max-w-5xl mx-auto relative z-10">
           <Fade className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-14">
             {statMeta.map((stat, i) => (
               <TiltCard key={i}>
@@ -2044,8 +2400,9 @@ function LandingBody() {
       </section>
 
       {/* PRICING */}
-      <section id="pricing" className="py-24 px-5" style={{ background: BG }}>
-        <div className="max-w-5xl mx-auto">
+      <section id="pricing" className="py-24 px-5 relative overflow-hidden" style={{ background: BG }}>
+        <ParallaxBg orb1Color="rgba(99,102,241,0.16)" orb2Color="rgba(139,92,246,0.1)" orb3Color="rgba(59,130,246,0.07)" showRings showBeams />
+        <div className="max-w-5xl mx-auto relative z-10">
           <Fade className="text-center mb-12">
             <SectionEyebrow>{t.pricing.eyebrow}</SectionEyebrow>
             <h2 className="font-bold text-white mb-3" style={{ fontSize: "clamp(28px, 5vw, 52px)", letterSpacing: "-0.045em" }}>
@@ -2074,6 +2431,7 @@ function LandingBody() {
 
       {/* FOOTER CTA */}
       <section className="py-28 px-5 text-center relative overflow-hidden" style={{ background: "#07070f" }}>
+        <ParallaxBg orb1Color="rgba(99,102,241,0.22)" orb2Color="rgba(139,92,246,0.16)" orb3Color="rgba(99,102,241,0.12)" particleCount={16} showRings showBeams />
         <div className="pointer-events-none absolute inset-0"
           style={{ background: "radial-gradient(ellipse 65% 55% at 50% 50%, rgba(99,102,241,0.16) 0%, transparent 68%)" }} />
         <Aurora />
@@ -2114,8 +2472,8 @@ function LandingBody() {
       <footer className="py-10 px-5" style={{ background: "#060609", borderTop: "1px solid rgba(255,255,255,0.04)" }}>
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-5">
           <div className="flex items-center gap-2.5">
-            <Image src="/icon.png" alt="SnapAha" width={24} height={24} className="rounded-md opacity-80" />
-            <Wordmark size={14} />
+            <Image src="/icon.png" alt="SnapAha" width={28} height={28} className="rounded-lg" style={{ filter: "drop-shadow(0 0 6px rgba(99,102,241,0.45))" }} />
+            <Wordmark size={16} />
             <span className="text-xs ml-2" style={{ color: "rgba(255,255,255,0.2)" }}>
               {t.footer.tagline}
             </span>
