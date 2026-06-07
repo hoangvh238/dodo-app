@@ -2,7 +2,7 @@
  * Credit pricing formula for Snapaha pay-as-you-go.
  *
  * 1 Credit = $0.001 USD (0.1 cent)
- * Free signup bonus: 100 credits ($0.10 value, ~100 basic queries on Gemini Flash)
+ * Free signup bonus: 50 credits ($0.05 value, ~50 basic queries on Gemini Flash)
  *
  * Strategy: 2.5–3× markup over provider cost to cover:
  *   - Infrastructure (Vercel, Supabase)

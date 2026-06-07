@@ -41,8 +41,8 @@ export async function verifyGoogleToken(accessToken: string): Promise<GoogleToke
       expires_in: data.expires_in ?? 3600,
     }
 
-    // Cache for min(5min, token lifetime - 30s buffer)
-    const cacheTtlMs = Math.min(5 * 60 * 1000, Math.max(0, (info.expires_in - 30) * 1000))
+    // Cache for min(2min, token lifetime - 30s buffer) — shorter TTL so revoked tokens expire faster
+    const cacheTtlMs = Math.min(2 * 60 * 1000, Math.max(0, (info.expires_in - 30) * 1000))
     cache.set(accessToken, { info, expiresAt: Date.now() + cacheTtlMs })
 
     // Evict stale entries every time we add a new one (simple GC)

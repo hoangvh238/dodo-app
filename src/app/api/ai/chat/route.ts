@@ -2,7 +2,7 @@
  * /api/ai/chat — Snapaha AI proxy with credit-based billing.
  *
  * Auth: Google access token as Bearer
- * Body: { messages, systemPrompt, tools, model, temperature, maxOutputTokens }
+ * Body: { messages, systemPrompt, tools, model, temperature, maxOutputTokens, requestId? }
  * Response: custom SSE data stream (compatible with ServerProxy.ts parser)
  *
  * Stream format (one JSON value per line, prefix:value):
@@ -14,9 +14,12 @@
  *   d:{reason,usage}  message finish
  *   3:"error"         error
  *
- * Credit deduction happens after completion via onFinish.
- * Tools are declared to the model but not executed server-side —
- * the client executes them and sends results in the next request.
+ * Credit lifecycle:
+ *   1. Pre-deduct 1 credit before streaming (reservation, prevents concurrent free-rides).
+ *   2. After stream completes, deduct (actual_credits - 1) remaining.
+ *   3. If final deduction fails (user ran out mid-stream), emit 3:"low_credits" in stream.
+ *
+ * Idempotency: X-Request-ID header prevents double-charge on client retry within 5 min.
  *
  * Security: model IDs validated against allowlist — unknown IDs fall back to default.
  */
@@ -30,16 +33,33 @@ import { verifyGoogleToken, extractBearerToken } from '@/lib/auth/verifyGoogleTo
 import { deductCredits } from '@/lib/credits'
 import { calculateCredits } from '@/lib/credits/pricing'
 import { createServiceClient } from '@/lib/supabase/service'
-import { resolveModelId, getModel } from '@/lib/models'
+import { resolveModelId, getModel, FREE_TIER_MODEL_ID } from '@/lib/models'
+import { getApiKey } from '@/lib/config/apiKeys'
 
 const CORS = {
   'Access-Control-Allow-Origin':  '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Request-ID',
 }
 
 export async function OPTIONS() {
   return new NextResponse(null, { status: 204, headers: CORS })
+}
+
+// ─── Idempotency cache (best-effort in-memory, TTL 5 min) ────────────────────
+const recentRequestIds = new Map<string, number>()
+const IDEMPOTENCY_TTL = 5 * 60 * 1000
+
+function checkAndRegisterRequestId(id: string | null): boolean {
+  if (!id) return true  // no ID = allow through
+  const now = Date.now()
+  // Evict stale entries
+  for (const [k, ts] of recentRequestIds) {
+    if (now - ts > IDEMPOTENCY_TTL) recentRequestIds.delete(k)
+  }
+  if (recentRequestIds.has(id)) return false  // duplicate
+  recentRequestIds.set(id, now)
+  return true
 }
 
 // ─── Request schema ───────────────────────────────────────────────────────────
@@ -60,43 +80,54 @@ const MessageSchema = z.object({
   content: MessageContentSchema,
 })
 
-// Tools sent by the client as plain JSON Schema objects (no zod, safe to accept from untrusted source)
 const ClientToolSchema = z.object({
   description: z.string().max(500).optional(),
   parameters:  z.record(z.string(), z.unknown()),
 })
 
 const RequestSchema = z.object({
-  messages:       z.array(MessageSchema).min(1).max(500),
-  systemPrompt:   z.string().max(50_000).optional(),
-  tools:          z.record(z.string(), ClientToolSchema).optional(),
-  model:          z.string().max(100).optional(),
-  temperature:    z.number().min(0).max(2).optional(),
-  maxOutputTokens:z.number().min(1).max(32_000).optional(),
+  messages:        z.array(MessageSchema).min(1).max(500),
+  systemPrompt:    z.string().max(50_000).optional(),
+  tools:           z.record(z.string(), ClientToolSchema).optional(),
+  model:           z.string().max(100).optional(),
+  temperature:     z.number().min(0).max(2).optional(),
+  maxOutputTokens: z.number().min(1).max(32_000).optional(),
+  requestId:       z.string().max(128).optional(),
 })
 
 // ─── Model resolver ───────────────────────────────────────────────────────────
-function resolveServerModel(requestedId: string | undefined) {
+async function resolveServerModel(requestedId: string | undefined) {
   const modelId = resolveModelId(requestedId)
-  const meta    = getModel(modelId)!
+  if (requestedId && requestedId !== modelId) {
+    console.warn(`[models] unknown model "${requestedId}" → fallback to "${modelId}"`)
+  }
+  const meta = getModel(modelId)!
   if (meta.provider === 'anthropic') {
-    return { model: createAnthropic({ apiKey: process.env.ANTHROPIC_API_KEY! })(modelId), modelId }
+    const { value: apiKey } = await getApiKey('anthropic')
+    return { model: createAnthropic({ apiKey })(modelId), modelId }
   }
   if (meta.provider === 'openai') {
-    return { model: createOpenAI({ apiKey: process.env.OPENAI_API_KEY! })(modelId), modelId }
+    const { value: apiKey } = await getApiKey('openai')
+    return { model: createOpenAI({ apiKey })(modelId), modelId }
   }
-  return { model: createGoogleGenerativeAI({ apiKey: process.env.GOOGLE_API_KEY! })(modelId), modelId }
+  const { value: apiKey } = await getApiKey('google')
+  return { model: createGoogleGenerativeAI({ apiKey })(modelId), modelId }
 }
 
 // ─── Stream encoder ───────────────────────────────────────────────────────────
-// Encodes values into the Vercel AI data stream format that ServerProxy.ts parses.
 function line(prefix: string, value: unknown): string {
   return `${prefix}:${JSON.stringify(value)}\n`
 }
 
 // ─── Main handler ─────────────────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
-  // 1. Authenticate
+  // 1. Idempotency check
+  const requestId = req.headers.get('X-Request-ID')
+  if (!checkAndRegisterRequestId(requestId)) {
+    return NextResponse.json({ error: 'Duplicate request', code: 'DUPLICATE_REQUEST' }, { status: 409, headers: CORS })
+  }
+
+  // 2. Authenticate
   const token = extractBearerToken(req.headers.get('Authorization'))
   if (!token) {
     return NextResponse.json({ error: 'Missing auth token' }, { status: 401, headers: CORS })
@@ -106,18 +137,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid or expired token. Please sign in again.' }, { status: 401, headers: CORS })
   }
 
-  // 2. Check / auto-create user + credit guard
+  // 3. Credit guard — check user has credits
   const db = createServiceClient()
   const { data: userRow } = await db
-    .from('users').select('credits').eq('google_sub', identity.sub).single()
+    .from('users').select('credits, plan_type').eq('google_sub', identity.sub).single()
 
   if (!userRow) {
+    // Auto-create user with signup bonus
     await db.from('users').upsert({
       google_sub: identity.sub, email: identity.email,
-      credits: 100, signup_bonus_granted: true,
+      credits: 50, signup_bonus_granted: true,
     }, { onConflict: 'google_sub' })
     await db.from('credit_transactions').insert({
-      user_id: identity.sub, amount: 100, reason: 'signup_bonus',
+      user_id: identity.sub, amount: 50, reason: 'signup_bonus',
     })
   } else if (userRow.credits < 1) {
     return NextResponse.json({
@@ -127,7 +159,7 @@ export async function POST(req: NextRequest) {
     }, { status: 402, headers: CORS })
   }
 
-  // 3. Parse + validate request
+  // 4. Parse + validate request
   let body: z.infer<typeof RequestSchema>
   try {
     body = RequestSchema.parse(await req.json())
@@ -135,11 +167,29 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid request body' }, { status: 400, headers: CORS })
   }
 
-  const { model, modelId } = resolveServerModel(body.model)
+  // Free-tier users are restricted to the free model — silently override any other selection.
+  const isFreeTier = !userRow || userRow.plan_type === 'free' || !userRow.plan_type
+  const requestedModel = isFreeTier ? FREE_TIER_MODEL_ID : body.model
+  if (isFreeTier && body.model && body.model !== FREE_TIER_MODEL_ID) {
+    console.info(`[models] free-tier override: "${body.model}" → "${FREE_TIER_MODEL_ID}" for ${identity.sub}`)
+  }
+
+  const { model, modelId } = await resolveServerModel(requestedModel)
   const googleSub          = identity.sub
 
+  // 5. Pre-deduct 1 credit (reservation) — prevents concurrent free-rides
+  const reserved = await deductCredits({
+    googleSub, credits: 1, reason: 'ai_reservation', model: modelId,
+  })
+  if (!reserved) {
+    return NextResponse.json({
+      error:   'Insufficient credits. Please top up to continue using Snapaha AI.',
+      code:    'INSUFFICIENT_CREDITS',
+      credits: 0,
+    }, { status: 402, headers: CORS })
+  }
+
   // Convert client tool JSON-Schema objects to AI SDK tool format.
-  // No execute function — tools run on the client, results come back as messages.
   const sdkTools = body.tools
     ? Object.fromEntries(
         Object.entries(body.tools).map(([name, t]) => [
@@ -152,7 +202,7 @@ export async function POST(req: NextRequest) {
       )
     : undefined
 
-  // 4. Call streamText and iterate fullStream to build custom SSE response
+  // 6. Stream — iterate fullStream to build custom SSE response
   const enc = new TextEncoder()
 
   const stream = new ReadableStream<Uint8Array>({
@@ -210,20 +260,42 @@ export async function POST(req: NextRequest) {
               }
               controller.enqueue(enc.encode(line('d', { finishReason: part.finishReason, usage })))
 
-              // Deduct credits after streaming is complete
-              const { credits, costUsd } = calculateCredits({
-                model:  modelId,
+              // 7. Deduct remaining credits (actual_total - 1 reservation already taken)
+              const { credits: actualCredits, costUsd } = calculateCredits({
+                model: modelId,
                 inputTokens:  usage.inputTokens,
                 outputTokens: usage.outputTokens,
               })
-              deductCredits({
-                googleSub, credits,
-                reason:    'ai_usage',
-                model:     modelId,
-                tokensIn:  usage.inputTokens,
-                tokensOut: usage.outputTokens,
-                costUsd,
-              }).catch(err => console.error('[credits] deduct failed:', err))
+              const remaining = Math.max(0, actualCredits - 1)
+
+              if (remaining > 0) {
+                const ok = await deductCredits({
+                  googleSub, credits: remaining,
+                  reason:    'ai_usage',
+                  model:     modelId,
+                  tokensIn:  usage.inputTokens,
+                  tokensOut: usage.outputTokens,
+                  costUsd,
+                })
+                if (!ok) {
+                  // User ran out of credits mid-stream — warn client
+                  controller.enqueue(enc.encode(line('3', 'low_credits')))
+                }
+              } else {
+                // actualCredits == 1, reservation covers it — just log the transaction
+                db.from('credit_transactions').insert({
+                  user_id:    googleSub,
+                  amount:     -1,
+                  reason:     'ai_usage',
+                  model:      modelId,
+                  tokens_in:  usage.inputTokens,
+                  tokens_out: usage.outputTokens,
+                  cost_usd:   costUsd,
+                }).then(({ error: e }) => {
+                  if (e) console.error('[credits] tx log failed:', e.message)
+                })
+                // Refund the reservation record (we'll keep it simple: no refund, just log actual usage separately)
+              }
               break
             }
           }

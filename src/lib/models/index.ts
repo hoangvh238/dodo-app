@@ -45,11 +45,17 @@ export const SERVER_MODEL_IDS = new Set(SERVER_MODELS.map(m => m.id))
 
 export const DEFAULT_SERVER_MODEL_ID = 'gemini-2.0-flash'
 
+/** Model enforced for free-tier users regardless of what the client requests. */
+export const FREE_TIER_MODEL_ID = 'gemini-2.5-flash'
+
 /** Resolve a client-requested model ID to a validated server model.
- *  Returns DEFAULT_SERVER_MODEL_ID if the requested model is unknown. */
+ *  Returns DEFAULT_SERVER_MODEL_ID if the requested model is unknown.
+ *  Logs a warning when an unknown model is requested (security audit trail). */
 export function resolveModelId(requested: string | undefined): string {
   if (!requested) return DEFAULT_SERVER_MODEL_ID
-  return SERVER_MODEL_IDS.has(requested) ? requested : DEFAULT_SERVER_MODEL_ID
+  if (SERVER_MODEL_IDS.has(requested)) return requested
+  console.warn(`[models] SECURITY: unknown model requested "${requested}" — falling back to "${DEFAULT_SERVER_MODEL_ID}"`)
+  return DEFAULT_SERVER_MODEL_ID
 }
 
 /** Find metadata for a model ID */

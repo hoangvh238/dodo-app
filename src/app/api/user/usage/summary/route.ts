@@ -21,6 +21,20 @@ export async function GET(req: NextRequest) {
 
   const db = createServiceClient()
 
+  // Verify user exists
+  const { data: userRow } = await db.from('users').select('credits').eq('google_sub', identity.sub).single()
+  if (!userRow) {
+    // New user with no history — return empty summary
+    const emptyDaily = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(Date.now() - (6 - i) * 24 * 60 * 60 * 1000)
+      return { date: d.toISOString().slice(0, 10), credits: 0 }
+    })
+    return NextResponse.json({
+      daily: emptyDaily, totalCreditsUsed: 0, totalRequests: 0,
+      totalTokensIn: 0, totalTokensOut: 0, weekCredits: 0, modelBreakdown: [],
+    }, { headers: CORS })
+  }
+
   // Fetch last 30 days of transactions for this user
   const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
   const { data: rows, error } = await db
